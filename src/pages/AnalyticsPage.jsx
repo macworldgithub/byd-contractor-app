@@ -29,8 +29,8 @@ export default function AnalyticsPage() {
     setExportLoading(format);
     try {
       const token = localStorage.getItem('byd_token');
-      const url = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
-      
+      const url = `${import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
+
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
             {/* Jobs by contractor */}
             {data.jobs_by_contractor && Object.keys(data.jobs_by_contractor).length > 0 && (
               <div className="card">

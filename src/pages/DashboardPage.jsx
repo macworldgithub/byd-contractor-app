@@ -156,7 +156,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Two column grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? 'repeat(auto-fit, minmax(280px, 1fr))' : '1fr', gap: '1.5rem' }}>
         {/* Recent Jobs */}
         <div className="card">
           <div className="card-header">
@@ -307,7 +307,7 @@ function EscalationQueue({ jobs, navigate }) {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
         {sections.map(({ label, color, items, icon }) => (
           <div key={label} style={{
             background: `${color}0d`, border: `1px solid ${color}30`,

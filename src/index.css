@@ -163,6 +163,7 @@ small { font-size: 0.8rem; color: var(--text-muted); }
 
 .page-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-6);
@@ -525,7 +526,7 @@ small { font-size: 0.8rem; color: var(--text-muted); }
    ============================================================ */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: var(--space-4);
 }
 
@@ -1615,6 +1616,32 @@ tr:hover td {
     padding: var(--space-4) var(--space-4) var(--space-8);
   }
 
+  /* Stat card compact on mobile */
+  .stat-card {
+    padding: var(--space-4);
+  }
+
+  .stat-card .stat-value {
+    font-size: 1.4rem;
+  }
+
+  .stat-card .stat-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: var(--space-2);
+  }
+
+  /* Page header stacks on mobile */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .page-header h1 {
+    font-size: 1.35rem;
+  }
+
   /* Mobile Topbar */
   .topbar {
     left: 0 !important;
@@ -1693,6 +1720,18 @@ tr:hover td {
 
   .mobile-live-pill .live-text {
     white-space: nowrap;
+  }
+
+  @media (max-width: 420px) {
+    .mobile-live-pill .live-text {
+      display: none;
+    }
+    .mobile-topbar-right {
+      gap: 4px;
+    }
+    .mobile-topbar-header {
+      gap: var(--space-2);
+    }
   }
 
   .mobile-icon-btn {

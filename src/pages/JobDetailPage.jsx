@@ -318,7 +318,7 @@ export default function JobDetailPage() {
 
       {/* Tab: Overview */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1.5rem' }} className="fade-in">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }} className="fade-in">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* Description */}
             {job.description && (

@@ -36,16 +36,16 @@ export default function Topbar() {
           <div className="mobile-brand-meta">
             BYD FAIRFIELD · CONTRACTOR HUB
           </div>
-          <h1 className="mobile-greeting-title">
-            {getGreeting()}, <span className="mobile-user-highlight">{user?.name?.split(' ')[0] || 'BYD'}</span>
-          </h1>
+          <div className="mobile-greeting-title">
+            BYD <span className="mobile-user-highlight">Contractor Hub</span>
+          </div>
         </div>
 
         <div className="mobile-topbar-right">
-          <div className="mobile-live-pill" title="Connected to Delivery Centre">
+          {/* <div className="mobile-live-pill" title="Connected to Delivery Centre">
             <span className="live-dot-pulse" />
             <span className="live-text">Live · AEST</span>
-          </div>
+          </div> */}
 
           <button
             className="mobile-icon-btn"

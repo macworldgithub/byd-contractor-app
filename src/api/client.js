@@ -1,5 +1,5 @@
 // API base URL — update this to your deployed backend
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com';
 
 // ---- Auth helpers ----
 export const getToken = () => localStorage.getItem('byd_token');

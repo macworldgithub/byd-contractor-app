@@ -97,7 +97,7 @@ export default function SettingsPage() {
         <h1>Settings</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', maxWidth: 900 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', maxWidth: 900 }}>
         {/* Account Info */}
         <div className="card">
           <div className="card-header">
