@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
     setExportLoading(format);
     try {
       const token = localStorage.getItem('byd_token');
-      const url = `${import.meta.env.VITE_API_URL || 'http://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
+      const url = `${import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
 
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
