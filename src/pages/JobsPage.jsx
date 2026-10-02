@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Filter, Search, Download, RefreshCw } from 'lucide-react';
+import { Plus, Filter, Search, Download, RefreshCw, Upload } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { jobsApi, contractorsApi, templatesApi } from '../api/client';
 import { useAuth, useIsAdmin } from '../contexts/AuthContext';
 import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, formatDate, taskProgress, timeAgo } from '../utils/helpers';
 import CreateJobModal from '../components/jobs/CreateJobModal';
+import BulkImportModal from '../components/jobs/BulkImportModal';
 
 const STATUS_OPTIONS = ['requested', 'collected', 'in_progress', 'returned', 'completed', 'invoiced'];
 const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent'];
@@ -23,6 +24,7 @@ export default function JobsPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [urgentOnly, setUrgentOnly] = useState(searchParams.get('is_urgent') === 'true');
   const [showCreate, setShowCreate] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [contractors, setContractors] = useState([]);
 
   const loadJobs = useCallback(async () => {
@@ -61,14 +63,19 @@ export default function JobsPage() {
     <AppLayout>
       <div className="page-header">
         <h1>Jobs</h1>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn btn-ghost btn-sm" onClick={loadJobs}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button className="btn btn-ghost btn-sm" onClick={loadJobs} title="Refresh jobs">
             <RefreshCw size={15} />
           </button>
           {isAdmin && (
-            <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-              <Plus size={16} /> New Job
-            </button>
+            <>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowBulkImport(true)}>
+                <Upload size={15} /> Import Trello / CSV
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                <Plus size={16} /> New Job
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -214,6 +221,15 @@ export default function JobsPage() {
           onCreated={(job) => {
             setShowCreate(false);
             navigate(`/jobs/${job.id}`);
+          }}
+        />
+      )}
+
+      {showBulkImport && (
+        <BulkImportModal
+          onClose={() => setShowBulkImport(false)}
+          onImported={() => {
+            loadJobs();
           }}
         />
       )}

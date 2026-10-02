@@ -9,7 +9,7 @@ import { getInitials } from '../../utils/helpers';
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['contractor', 'admin', 'super_admin'] },
   { to: '/jobs', icon: Briefcase, label: 'Jobs', roles: ['contractor', 'admin', 'super_admin'] },
-  { to: '/kanban', icon: Layers, label: 'Kanban Board', roles: ['admin', 'super_admin'] },
+  { to: '/kanban', icon: Layers, label: 'Kanban Board', roles: ['contractor', 'admin', 'super_admin'] },
   { to: '/analytics', icon: BarChart2, label: 'Analytics', roles: ['admin', 'super_admin'] },
   { to: '/templates', icon: Zap, label: 'Templates', roles: ['admin', 'super_admin'] },
   { to: '/time-logs', icon: Clock, label: 'Time Logs', roles: ['admin', 'super_admin'] },

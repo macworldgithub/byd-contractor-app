@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { offlineApi } from './api/client';
+import { initOfflineSync } from './utils/offlineQueue';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -40,6 +43,15 @@ function ProtectedRoute({ children, adminOnly = false }) {
 function AppRoutes() {
   const { user } = useAuth();
 
+  useEffect(() => {
+    if (user) {
+      const cleanup = initOfflineSync(offlineApi, (result) => {
+        console.log(`[OfflineSync] Flushed ${result.succeeded} actions.`);
+      });
+      return cleanup;
+    }
+  }, [user]);
+
   return (
     <Routes>
       <Route
@@ -50,7 +62,7 @@ function AppRoutes() {
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="/jobs" element={<ProtectedRoute><JobsPage /></ProtectedRoute>} />
       <Route path="/jobs/:id" element={<ProtectedRoute><JobDetailPage /></ProtectedRoute>} />
-      <Route path="/kanban" element={<ProtectedRoute adminOnly><KanbanPage /></ProtectedRoute>} />
+      <Route path="/kanban" element={<ProtectedRoute><KanbanPage /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute adminOnly><AnalyticsPage /></ProtectedRoute>} />
       <Route path="/templates" element={<ProtectedRoute adminOnly><TemplatesPage /></ProtectedRoute>} />
       <Route path="/time-logs" element={<ProtectedRoute adminOnly><TimeLogsPage /></ProtectedRoute>} />

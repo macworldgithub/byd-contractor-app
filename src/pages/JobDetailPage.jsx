@@ -11,6 +11,7 @@ import {
   locationApi, activityApi, contractorsApi
 } from '../api/client';
 import { useAuth, useIsAdmin } from '../contexts/AuthContext';
+import { addToQueue } from '../utils/offlineQueue';
 import {
   STATUS_LABELS, STATUS_ORDER, PRIORITY_LABELS,
   formatDate, formatDateTime, formatDuration, timeAgo, taskProgress, getInitials
@@ -27,6 +28,7 @@ export default function JobDetailPage() {
   const [activity, setActivity] = useState([]);
   const [evidence, setEvidence] = useState([]);
   const [timeLogs, setTimeLogs] = useState([]);
+  const [locationHistory, setLocationHistory] = useState([]);
   const [contractors, setContractors] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [activeLog, setActiveLog] = useState(null);
@@ -36,21 +38,24 @@ export default function JobDetailPage() {
   const [actionLoading, setActionLoading] = useState('');
   const [evidenceStage, setEvidenceStage] = useState('before');
   const [locationLoading, setLocationLoading] = useState(false);
+  const [customBay, setCustomBay] = useState('');
   const [taskTimers, setTaskTimers] = useState({}); // { taskId: { running, startTs, accumulated } }
   const taskTimerRefs = useRef({});
 
   const reload = async () => {
     try {
-      const [jobData, actData, evData, tlData] = await Promise.all([
+      const [jobData, actData, evData, tlData, locData] = await Promise.all([
         jobsApi.get(id),
-        activityApi.list(id),
-        evidenceApi.list(id),
-        timeApi.getLogs(id),
+        activityApi.list(id).catch(() => []),
+        evidenceApi.list(id).catch(() => []),
+        timeApi.getLogs(id).catch(() => []),
+        locationApi.history(id).catch(() => []),
       ]);
       setJob(jobData);
       setActivity(Array.isArray(actData) ? actData : []);
       setEvidence(Array.isArray(evData) ? evData : []);
       setTimeLogs(Array.isArray(tlData) ? tlData : []);
+      setLocationHistory(Array.isArray(locData) ? locData : []);
 
       const openLog = tlData?.find?.(l => !l.clock_out);
       setActiveLog(openLog || null);
@@ -75,23 +80,68 @@ export default function JobDetailPage() {
     return () => clearInterval(interval);
   }, [activeLog]);
 
+  const isOfflineError = (err) =>
+    !navigator.onLine ||
+    err?.message === 'Offline' ||
+    err?.message?.toLowerCase().includes('failed to fetch') ||
+    err?.message?.toLowerCase().includes('networkerror');
+
   const handleClockIn = async () => {
     setActionLoading('clock');
-    try { await timeApi.clockIn(id); await reload(); } catch (e) { alert(e.message); }
+    try {
+      if (!navigator.onLine) throw new Error('Offline');
+      await timeApi.clockIn(id);
+      await reload();
+    } catch (e) {
+      if (isOfflineError(e)) {
+        addToQueue({ action_type: 'clock_in', job_id: id, payload: { task_id: null } });
+        setActiveLog({ clock_in: new Date().toISOString(), contractor_name: user?.name, job_id: id });
+        alert('Clock-in saved offline. Will sync automatically when connected.');
+      } else {
+        alert(e.message);
+      }
+    }
     setActionLoading('');
   };
 
   const handleClockOut = async () => {
     setActionLoading('clock');
-    try { await timeApi.clockOut(id); await reload(); } catch (e) { alert(e.message); }
+    try {
+      if (!navigator.onLine) throw new Error('Offline');
+      await timeApi.clockOut(id);
+      await reload();
+    } catch (e) {
+      if (isOfflineError(e)) {
+        addToQueue({ action_type: 'clock_out', job_id: id, payload: {} });
+        setActiveLog(null);
+        alert('Clock-out saved offline. Will sync automatically when connected.');
+      } else {
+        alert(e.message);
+      }
+    }
     setActionLoading('');
   };
 
   const handleTaskToggle = async (task) => {
+    const nextCompleted = !task.completed;
+    // Optimistic UI update
+    setJob(prev => prev ? ({
+      ...prev,
+      checklist: prev.checklist.map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t)
+    }) : prev);
+
     try {
-      await tasksApi.update(id, task.id, { completed: !task.completed });
+      if (!navigator.onLine) throw new Error('Offline');
+      await tasksApi.update(id, task.id, { completed: nextCompleted });
       await reload();
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      if (isOfflineError(e)) {
+        addToQueue({ action_type: 'update_task', job_id: id, payload: { task_id: task.id, completed: nextCompleted } });
+      } else {
+        alert(e.message);
+        await reload();
+      }
+    }
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -103,21 +153,40 @@ export default function JobDetailPage() {
   const handleComment = async (e) => {
     e.preventDefault();
     if (!comment.trim()) return;
+    const msg = comment;
+    setComment('');
     try {
-      await activityApi.addComment(id, comment);
-      setComment('');
+      if (!navigator.onLine) throw new Error('Offline');
+      await activityApi.addComment(id, msg);
       await reload();
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      if (isOfflineError(e)) {
+        addToQueue({ action_type: 'add_comment', job_id: id, payload: { message: msg } });
+        alert('Comment queued offline.');
+      } else {
+        alert(e.message);
+      }
+    }
   };
 
   const handleFlagIssue = async () => {
     if (!issueText.trim()) { alert('Please describe the issue'); return; }
+    const text = issueText;
     setActionLoading('flag');
     try {
-      await activityApi.flagIssue(id, issueText, true, []);
+      if (!navigator.onLine) throw new Error('Offline');
+      await activityApi.flagIssue(id, text, true, []);
       setIssueText('');
       await reload();
-    } catch (e) { alert(e.message); }
+    } catch (e) {
+      if (isOfflineError(e)) {
+        addToQueue({ action_type: 'flag_issue', job_id: id, payload: { description: text, is_urgent: true } });
+        setIssueText('');
+        alert('Issue flagged offline. Will sync when back online.');
+      } else {
+        alert(e.message);
+      }
+    }
     setActionLoading('');
   };
 
@@ -166,22 +235,50 @@ export default function JobDetailPage() {
 
   const handleLocationCheckIn = () => {
     setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(async (pos) => {
+    const locName = customBay.trim() || job?.bay_location || job?.site_location || 'BYD Fairfield';
+
+    const saveLoc = async (data) => {
       try {
-        await locationApi.checkIn(id, {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          location_name: job?.site_location || 'BYD Fairfield',
-        });
+        if (!navigator.onLine) throw new Error('Offline');
+        await locationApi.checkIn(id, data);
         await reload();
+        setCustomBay('');
         alert('Location checked in successfully!');
-      } catch (e) { alert(e.message); }
-      setLocationLoading(false);
-    }, () => {
-      alert('Could not get location. Please allow GPS access.');
-      setLocationLoading(false);
-    });
+      } catch (e) {
+        if (isOfflineError(e)) {
+          addToQueue({ action_type: 'location_checkin', job_id: id, payload: data });
+          setCustomBay('');
+          alert('Location saved offline. Will sync when connection is restored.');
+        } else {
+          alert(e.message);
+        }
+      } finally {
+        setLocationLoading(false);
+      }
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          saveLoc({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            location_name: locName,
+          });
+        },
+        () => {
+          // GPS unavailable or denied, still check-in location name
+          saveLoc({
+            location_name: locName,
+            notes: 'GPS unavailable'
+          });
+        },
+        { timeout: 7000 }
+      );
+    } else {
+      saveLoc({ location_name: locName });
+    }
   };
 
   const handleAssignContractor = async (contractorId) => {
@@ -302,7 +399,7 @@ export default function JobDetailPage() {
 
       {/* Tabs */}
       <div className="tabs">
-        {['overview', 'checklist', 'evidence', 'activity', 'time'].map(tab => (
+        {['overview', 'checklist', 'evidence', 'location', 'activity', 'time'].map(tab => (
           <button
             key={tab}
             id={`tab-${tab}`}
@@ -311,6 +408,7 @@ export default function JobDetailPage() {
           >
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
             {tab === 'evidence' && evidence.length > 0 && ` (${evidence.length})`}
+            {tab === 'location' && locationHistory.length > 0 && ` (${locationHistory.length})`}
             {tab === 'activity' && activity.length > 0 && ` (${activity.length})`}
           </button>
         ))}
@@ -328,24 +426,31 @@ export default function JobDetailPage() {
               </div>
             )}
 
-            {/* Status Workflow */}
-            {isAdmin && (
-              <div className="card">
-                <div className="card-title" style={{ marginBottom: '1rem' }}>Move Status</div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {STATUS_ORDER.map(s => (
+            {/* Status Workflow (Admins + Assigned Contractors) */}
+            <div className="card">
+              <div className="card-title" style={{ marginBottom: '1rem' }}>
+                {isAdmin ? 'Move Status' : 'Update Job Workflow'}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {STATUS_ORDER.map((s, idx) => {
+                  const isCurrent = s === job.status;
+                  const curIdx = STATUS_ORDER.indexOf(job.status);
+                  const isNext = idx === curIdx + 1;
+                  return (
                     <button
                       key={s}
-                      className={`btn btn-sm ${s === job.status ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => s !== job.status && handleStatusChange(s)}
-                      disabled={s === job.status || actionLoading === 'status'}
+                      className={`btn btn-sm ${isCurrent ? 'btn-primary' : isNext ? 'btn-secondary' : 'btn-ghost'}`}
+                      onClick={() => !isCurrent && handleStatusChange(s)}
+                      disabled={isCurrent || actionLoading === 'status'}
+                      style={isNext ? { borderColor: 'var(--byd-red)', color: 'var(--byd-red)', fontWeight: 700 } : undefined}
+                      title={isNext ? `Next: Move to ${STATUS_LABELS[s]}` : undefined}
                     >
-                      {STATUS_LABELS[s]}
+                      {isCurrent ? '✓ ' : isNext ? '→ ' : ''}{STATUS_LABELS[s]}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
 
             {/* Contractor assignment */}
             {isAdmin && (
@@ -528,6 +633,93 @@ export default function JobDetailPage() {
               <p>Upload before/during/after photos and videos</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Tab: Location History & Check-In */}
+      {activeTab === 'location' && (
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: 850 }}>
+          {/* Current Location Card */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <MapPin size={18} color="var(--byd-red)" /> Current Vehicle Location
+              </span>
+              <span className="badge badge-normal">{job.site_location || 'BYD Fairfield'}</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Site Location</div>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{job.site_location || 'Fairfield'}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Bay / Workshop Area</div>
+                <div style={{ fontWeight: 600, fontSize: '0.95rem', color: job.bay_location ? 'var(--byd-red)' : 'var(--text-muted)' }}>
+                  {job.bay_location || 'Not specified'}
+                </div>
+              </div>
+            </div>
+
+            {/* Check-in input & button */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                className="form-input"
+                style={{ flex: '1 1 200px' }}
+                placeholder="Enter bay / area (e.g. Bay 4, Tint Shed, Detailing)..."
+                value={customBay}
+                onChange={e => setCustomBay(e.target.value)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleLocationCheckIn}
+                disabled={locationLoading}
+              >
+                <MapPin size={16} />
+                {locationLoading ? 'Registering GPS...' : 'Register Vehicle Location'}
+              </button>
+            </div>
+          </div>
+
+          {/* Location Movement History Log */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Vehicle Movement &amp; Check-In History ({locationHistory.length})</span>
+            </div>
+            {locationHistory.length === 0 ? (
+              <div className="empty-state" style={{ padding: '2rem' }}>
+                <div className="empty-state-icon"><MapPin size={24} /></div>
+                <h3>No location check-ins yet</h3>
+                <p>Location entries and GPS check-ins will appear here as the vehicle moves</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>Location / Bay</th>
+                      <th>GPS Coordinates</th>
+                      <th>Accuracy</th>
+                      <th>Recorded By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {locationHistory.map((loc) => (
+                      <tr key={loc.id}>
+                        <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{formatDateTime(loc.recorded_at)}</td>
+                        <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{loc.location_name || 'Fairfield'}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                          {loc.latitude && loc.longitude ? `${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}` : '—'}
+                        </td>
+                        <td style={{ fontSize: '0.78rem' }}>{loc.accuracy ? `±${Math.round(loc.accuracy)}m` : '—'}</td>
+                        <td style={{ fontSize: '0.8rem' }}>{loc.recorded_by_name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

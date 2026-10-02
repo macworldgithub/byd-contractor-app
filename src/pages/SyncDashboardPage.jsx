@@ -4,7 +4,7 @@ import {
   RotateCcw, ExternalLink, Database, Wifi, WifiOff, ChevronDown, ChevronUp
 } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
-import { integrationApi, jobsApi } from '../api/client';
+import { integrationApi, jobsApi, DELIVERY_CENTRE_URL } from '../api/client';
 import { formatDateTime, timeAgo } from '../utils/helpers';
 
 export default function SyncDashboardPage() {
@@ -52,10 +52,14 @@ export default function SyncDashboardPage() {
 
   const toggleExpanded = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
-  const synced = recentJobs.filter(j => j.sync_status === 'synced' || j.dc_job_id);
-  const failed = recentJobs.filter(j => j.sync_status === 'failed' || j.sync_error);
-  const pending = recentJobs.filter(j => j.sync_status === 'pending' && !j.dc_job_id && !j.sync_error);
-  const never = recentJobs.filter(j => !j.sync_status && !j.dc_job_id);
+  const isJobSynced = (j) => j.sync_status === 'synced' || (Boolean(j.client_id || j.dc_job_id) && j.sync_status !== 'failed' && !j.sync_error);
+  const isJobFailed = (j) => j.sync_status === 'failed' || Boolean(j.sync_error);
+  const isJobPending = (j) => j.sync_status === 'pending' && !isJobSynced(j) && !isJobFailed(j);
+
+  const synced = recentJobs.filter(isJobSynced);
+  const failed = recentJobs.filter(isJobFailed);
+  const pending = recentJobs.filter(isJobPending);
+  const never = recentJobs.filter(j => !isJobSynced(j) && !isJobFailed(j) && !isJobPending(j));
 
   const healthPct = recentJobs.length > 0
     ? Math.round((synced.length / recentJobs.length) * 100) : 100;
@@ -216,14 +220,25 @@ export default function SyncDashboardPage() {
               <thead><tr><th>Job</th><th>VIN</th><th>DC ID</th><th>Sync Status</th><th>Last Sync</th><th>Action</th></tr></thead>
               <tbody>
                 {recentJobs.map(job => {
-                  const isSynced = job.dc_job_id || job.sync_status === 'synced';
-                  const isFailed = job.sync_status === 'failed' || job.sync_error;
+                  const dcId = job.client_id || job.dc_job_id;
+                  const isSynced = job.sync_status === 'synced' || (Boolean(dcId) && job.sync_status !== 'failed' && !job.sync_error);
+                  const isFailed = job.sync_status === 'failed' || Boolean(job.sync_error);
                   return (
                     <tr key={job.id}>
                       <td style={{ fontWeight: 600 }}>{job.model_name}</td>
                       <td style={{ fontFamily: 'monospace', fontSize: '0.78rem' }}>{job.full_vin || job.last_6_vin}</td>
-                      <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: isSynced ? '#10b981' : 'var(--text-muted)' }}>
-                        {job.dc_job_id ? <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>{job.dc_job_id} <ExternalLink size={11} /></span> : '—'}
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: dcId ? '#10b981' : 'var(--text-muted)' }}>
+                        {dcId ? (
+                          <a
+                            href={`${DELIVERY_CENTRE_URL}/clients/${dcId}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#10b981', textDecoration: 'none' }}
+                            title="Open client in Delivery Centre"
+                          >
+                            {dcId.slice(0, 8)}... <ExternalLink size={11} />
+                          </a>
+                        ) : '—'}
                       </td>
                       <td>
                         {isSynced ? <SyncBadge synced /> : isFailed ? <SyncBadge failed /> : job.sync_status === 'pending' ? <SyncBadge pending /> : <SyncBadge />}

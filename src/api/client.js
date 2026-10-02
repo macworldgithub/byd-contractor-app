@@ -1,5 +1,5 @@
-// API base URL — update this to your deployed backend
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://byd-panel.omnisuiteai.com';
+export const DELIVERY_CENTRE_URL = import.meta.env.VITE_DELIVERY_CENTRE_URL || 'https://deliverycentre.goodshowroom.com';
 
 // ---- Auth helpers ----
 export const getToken = () => localStorage.getItem('byd_token');

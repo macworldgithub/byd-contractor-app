@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Zap } from 'lucide-react';
 import { jobsApi, templatesApi } from '../../api/client';
 
 const STATUS_OPTIONS = ['requested', 'collected', 'in_progress', 'returned', 'completed', 'invoiced'];
 const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent'];
 
-export default function CreateJobModal({ contractors, onClose, onCreated }) {
+export default function CreateJobModal({ contractors, initialTemplate = null, onClose, onCreated }) {
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(initialTemplate?.id || '');
   const [form, setForm] = useState({
     model_name: '',
     full_vin: '',
@@ -19,12 +21,41 @@ export default function CreateJobModal({ contractors, onClose, onCreated }) {
     due_date: '',
     delivery_date_time: '',
     is_urgent: false,
+    template_id: initialTemplate?.id || null,
   });
-  const [taskLines, setTaskLines] = useState('');
+  const [taskLines, setTaskLines] = useState(initialTemplate?.tasks?.join('\n') || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+
+  useEffect(() => {
+    templatesApi.list().then(data => {
+      const list = Array.isArray(data) ? data : [];
+      setTemplates(list);
+      if (initialTemplate) {
+        applyTemplate(initialTemplate);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const applyTemplate = (t) => {
+    if (!t) return;
+    setSelectedTemplateId(t.id);
+    if (t.tasks?.length) setTaskLines(t.tasks.join('\n'));
+    if (t.description && !form.description) set('description', t.description);
+    set('template_id', t.id);
+  };
+
+  const handleTemplateChange = (tmplId) => {
+    setSelectedTemplateId(tmplId);
+    if (!tmplId) {
+      set('template_id', null);
+      return;
+    }
+    const t = templates.find(x => x.id === tmplId);
+    if (t) applyTemplate(t);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -57,6 +88,25 @@ export default function CreateJobModal({ contractors, onClose, onCreated }) {
 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {templates.length > 0 && (
+              <div className="form-group" style={{ background: 'var(--surface-elevated)', padding: '0.75rem', borderRadius: 'var(--radius-md)' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--byd-red)' }}>
+                  <Zap size={14} /> Quick-Fill from Template
+                </label>
+                <select
+                  className="form-select"
+                  value={selectedTemplateId}
+                  onChange={e => handleTemplateChange(e.target.value)}
+                >
+                  <option value="">— Choose a template to pre-fill tasks —</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.category ? `(${t.category})` : ''} · {t.tasks?.length || 0} tasks
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Model Name *</label>

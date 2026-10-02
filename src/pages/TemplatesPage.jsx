@@ -1,20 +1,29 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
-import { templatesApi } from '../api/client';
-import { Plus, Edit3, Trash2, X, Zap } from 'lucide-react';
+import { templatesApi, contractorsApi } from '../api/client';
+import { Plus, Edit3, Trash2, X, Zap, ArrowRight } from 'lucide-react';
 import { timeAgo } from '../utils/helpers';
+import CreateJobModal from '../components/jobs/CreateJobModal';
 
 export default function TemplatesPage() {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editTemplate, setEditTemplate] = useState(null);
+  const [activeJobTemplate, setActiveJobTemplate] = useState(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const data = await templatesApi.list();
+      const [data, cData] = await Promise.all([
+        templatesApi.list(),
+        contractorsApi.list().catch(() => [])
+      ]);
       setTemplates(Array.isArray(data) ? data : []);
+      setContractors(Array.isArray(cData) ? cData : []);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -75,8 +84,15 @@ export default function TemplatesPage() {
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                Updated {timeAgo(t.updated_at)}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--surface-border)' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Updated {timeAgo(t.updated_at)}</span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                  onClick={() => setActiveJobTemplate(t)}
+                >
+                  <Zap size={12} /> Use Template
+                </button>
               </div>
             </div>
           ))}
@@ -85,6 +101,17 @@ export default function TemplatesPage() {
 
       {showCreate && <TemplateModal onClose={() => setShowCreate(false)} onSave={async (f) => { await templatesApi.create(f); setShowCreate(false); load(); }} />}
       {editTemplate && <TemplateModal template={editTemplate} onClose={() => setEditTemplate(null)} onSave={async (f) => { await templatesApi.update(editTemplate.id, f); setEditTemplate(null); load(); }} />}
+      {activeJobTemplate && (
+        <CreateJobModal
+          contractors={contractors}
+          initialTemplate={activeJobTemplate}
+          onClose={() => setActiveJobTemplate(null)}
+          onCreated={(job) => {
+            setActiveJobTemplate(null);
+            navigate(`/jobs/${job.id}`);
+          }}
+        />
+      )}
     </AppLayout>
   );
 }

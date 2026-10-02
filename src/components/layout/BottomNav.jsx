@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { useAuth, useIsAdmin } from '../../contexts/AuthContext';
 import { getInitials } from '../../utils/helpers';
-import { getQueueSize } from '../../utils/offlineQueue';
+import { getQueueSize, flushOfflineQueue } from '../../utils/offlineQueue';
+import { offlineApi } from '../../api/client';
 
 export default function BottomNav() {
   const { user, logout } = useAuth();
@@ -45,6 +46,7 @@ export default function BottomNav() {
   const contractorTabs = [
     { to: '/', label: 'Today', icon: LayoutDashboard, exact: true },
     { to: '/jobs', label: 'My Jobs', icon: Briefcase, exact: false },
+    { to: '/kanban', label: 'Board', icon: Layers, exact: false },
     { to: '/settings', label: 'Profile', icon: Settings, exact: false },
   ];
 
@@ -221,9 +223,18 @@ export default function BottomNav() {
               </NavLink>
 
               {queueSize > 0 && (
-                <div className="mobile-more-offline-banner">
+                <div
+                  className="mobile-more-offline-banner"
+                  onClick={async () => {
+                    const res = await flushOfflineQueue(offlineApi);
+                    setQueueSize(getQueueSize());
+                    if (res && res.succeeded > 0) alert(`Synced ${res.succeeded} actions!`);
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  title="Tap to sync now"
+                >
                   <WifiOff size={16} />
-                  <span>{queueSize} offline actions waiting to sync</span>
+                  <span>{queueSize} offline actions waiting to sync (Tap to sync)</span>
                 </div>
               )}
 

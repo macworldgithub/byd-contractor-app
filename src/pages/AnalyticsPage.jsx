@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
     setExportLoading(format);
     try {
       const token = localStorage.getItem('byd_token');
-      const url = `${import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
+      const url = `${import.meta.env.VITE_API_URL || 'http://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
 
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -175,6 +175,43 @@ export default function AnalyticsPage() {
               </div>
             )}
           </div>
+
+          {/* Jobs Completed per VIN (Scope §5) */}
+          {data.completed_per_vin && data.completed_per_vin.length > 0 && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Jobs Completed per VIN ({data.completed_per_vin.length})</span>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Full VIN</th>
+                      <th>Last 6</th>
+                      <th>Vehicle Model</th>
+                      <th>Contractor</th>
+                      <th>Completed Date</th>
+                      <th>Total Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.completed_per_vin.map((item) => (
+                      <tr key={item.job_id || item.vin}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>{item.vin}</td>
+                        <td style={{ fontFamily: 'monospace', color: 'var(--byd-red)' }}>{item.last_6_vin}</td>
+                        <td>{item.model}</td>
+                        <td>{item.contractor || '—'}</td>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {item.completed_at ? new Date(item.completed_at).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        </td>
+                        <td style={{ fontWeight: 600 }}>{item.total_minutes} mins</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </AppLayout>
