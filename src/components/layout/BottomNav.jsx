@@ -3,15 +3,17 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Briefcase, Layers, Clock,
   MoreHorizontal, Users, BarChart2, Zap, Settings,
-  LogOut, X, WifiOff, CheckCircle2, ChevronRight, Activity
+  LogOut, X, WifiOff, CheckCircle2, ChevronRight, Activity, Download
 } from 'lucide-react';
 import { useAuth, useIsAdmin } from '../../contexts/AuthContext';
+import { usePWA } from '../../contexts/PWAContext';
 import { getInitials } from '../../utils/helpers';
 import { getQueueSize, flushOfflineQueue } from '../../utils/offlineQueue';
 import { offlineApi } from '../../api/client';
 
 export default function BottomNav() {
   const { user, logout } = useAuth();
+  const { canInstall, isInstalled, installApp, setShowInstallBanner } = usePWA();
   const isAdmin = useIsAdmin();
   const location = useLocation();
   const navigate = useNavigate();
@@ -221,6 +223,30 @@ export default function BottomNav() {
                 </div>
                 <ChevronRight size={16} className="chevron" />
               </NavLink>
+
+              {!isInstalled && (
+                <div
+                  className="mobile-more-item"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    if (canInstall) {
+                      installApp();
+                    } else {
+                      setShowInstallBanner(true);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="mobile-more-icon-box" style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' }}>
+                    <Download size={18} />
+                  </div>
+                  <div className="mobile-more-item-info">
+                    <span className="mobile-more-title" style={{ color: '#f87171' }}>Install App</span>
+                    <span className="mobile-more-sub">Add to home screen for offline access</span>
+                  </div>
+                  <ChevronRight size={16} className="chevron" />
+                </div>
+              )}
 
               {queueSize > 0 && (
                 <div

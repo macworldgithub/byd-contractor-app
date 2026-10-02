@@ -28,6 +28,8 @@ export default function KanbanPage() {
   const [urgentOnly, setUrgentOnly] = useState(false);
   const [dragOverColumn, setDragOverColumn] = useState(null);
 
+  const [activeMobileColumn, setActiveMobileColumn] = useState('requested');
+
   const load = async () => {
     setLoading(true);
     try {
@@ -125,23 +127,13 @@ export default function KanbanPage() {
       </div>
 
       {/* Filter Toolbar */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-        alignItems: 'center',
-        padding: '0.75rem 1rem',
-        background: 'var(--surface-card)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--surface-border)',
-        marginBottom: '1.25rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 200 }}>
+      <div className="kanban-filter-toolbar">
+        <div className="kanban-search-box">
           <Search size={16} style={{ color: 'var(--text-muted)' }} />
           <input
             type="text"
             className="form-input"
-            style={{ height: 34, fontSize: '0.82rem', padding: '0 8px' }}
+            style={{ height: 36, fontSize: '0.82rem', padding: '0 8px' }}
             placeholder="Search by VIN, Model, Contractor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -149,11 +141,11 @@ export default function KanbanPage() {
         </div>
 
         {contractors.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <div className="kanban-filter-item">
             <Filter size={15} style={{ color: 'var(--text-muted)' }} />
             <select
               className="form-select"
-              style={{ height: 34, fontSize: '0.82rem', width: 170 }}
+              style={{ height: 36, fontSize: '0.82rem' }}
               value={filterContractor}
               onChange={(e) => setFilterContractor(e.target.value)}
             >
@@ -167,7 +159,7 @@ export default function KanbanPage() {
           </div>
         )}
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', userSelect: 'none' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.82rem', userSelect: 'none', padding: '6px 4px' }}>
           <input
             type="checkbox"
             checked={urgentOnly}
@@ -181,7 +173,7 @@ export default function KanbanPage() {
         {(search || filterContractor || urgentOnly) && (
           <button
             className="btn btn-ghost btn-sm"
-            style={{ fontSize: '0.75rem', height: 32, padding: '0 8px' }}
+            style={{ fontSize: '0.75rem', height: 34, padding: '0 10px' }}
             onClick={() => {
               setSearch('');
               setFilterContractor('');
@@ -191,6 +183,37 @@ export default function KanbanPage() {
             Reset filters
           </button>
         )}
+      </div>
+
+      {/* Mobile Stage Switcher Pills */}
+      <div className="kanban-mobile-tabs" role="tablist">
+        {STATUS_ORDER.map((status) => (
+          <button
+            key={status}
+            type="button"
+            className={`kanban-mobile-tab-btn ${activeMobileColumn === status ? 'active' : ''}`}
+            onClick={() => {
+              setActiveMobileColumn(status);
+              const el = document.getElementById(`kanban-col-${status}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+              }
+            }}
+          >
+            <span className="column-dot" style={{ background: STATUS_DOT_COLORS[status] }} />
+            <span>{STATUS_LABELS[status]}</span>
+            <span style={{
+              background: activeMobileColumn === status ? 'var(--byd-red)' : 'var(--surface-3)',
+              color: activeMobileColumn === status ? '#ffffff' : 'var(--text-muted)',
+              fontSize: '0.68rem',
+              borderRadius: 999,
+              padding: '1px 6px',
+              fontWeight: 700
+            }}>
+              {jobsByStatus[status]?.length || 0}
+            </span>
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -204,6 +227,7 @@ export default function KanbanPage() {
             return (
               <div
                 key={status}
+                id={`kanban-col-${status}`}
                 className="kanban-column"
                 onDragOver={(e) => handleDragOver(e, status)}
                 onDragLeave={(e) => handleDragLeave(e, status)}

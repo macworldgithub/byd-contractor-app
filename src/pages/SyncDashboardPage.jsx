@@ -267,7 +267,7 @@ export default function SyncDashboardPage() {
             </span>
             <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', borderRadius: 999, padding: '3px 10px', fontSize: '0.72rem', fontWeight: 700 }}>CONNECTED</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '1rem' }}>
             {Object.entries(syncStatus).map(([k, v]) => (
               <div key={k} style={{ fontSize: '0.8rem' }}>
                 <div style={{ color: 'var(--text-muted)', marginBottom: 2, textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</div>

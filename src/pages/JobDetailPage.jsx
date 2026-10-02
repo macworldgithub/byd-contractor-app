@@ -361,7 +361,7 @@ export default function JobDetailPage() {
 
       {/* CONTRACTOR: Large Action Buttons */}
       {!isAdmin && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="contractor-action-grid">
           {activeLog ? (
             <button
               className="clock-btn clock-out"
@@ -416,7 +416,7 @@ export default function JobDetailPage() {
 
       {/* Tab: Overview */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }} className="fade-in">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }} className="fade-in">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             {/* Description */}
             {job.description && (

@@ -79,6 +79,9 @@ export default function CreateJobModal({ contractors, initialTemplate = null, on
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal modal-lg">
+        <div className="mobile-handle-bar">
+          <div className="mobile-handle" />
+        </div>
         <div className="modal-header">
           <h3>Create New Job</h3>
           <button className="btn-icon" onClick={onClose}><X size={18} /></button>

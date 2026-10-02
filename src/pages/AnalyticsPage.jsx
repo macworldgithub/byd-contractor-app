@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
     <AppLayout>
       <div className="page-header">
         <h1>Analytics & Reports</h1>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button className="btn btn-ghost btn-sm" onClick={() => handleExport('csv')} disabled={!!exportLoading}>
             <Download size={15} /> CSV
           </button>
@@ -74,16 +74,16 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Date filters */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-        <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
+      <div className="analytics-date-filters">
+        <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem', flex: '1 1 180px' }}>
           <label className="form-label" style={{ whiteSpace: 'nowrap' }}>From</label>
-          <input type="date" className="form-input" style={{ width: 160 }} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+          <input type="date" className="form-input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         </div>
-        <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem', flex: '1 1 180px' }}>
           <label className="form-label" style={{ whiteSpace: 'nowrap' }}>To</label>
-          <input type="date" className="form-input" style={{ width: 160 }} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+          <input type="date" className="form-input" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
-        <button className="btn btn-ghost btn-sm" onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</button>
+        <button className="btn btn-ghost btn-sm" style={{ height: 38 }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</button>
       </div>
 
       {loading ? (
@@ -130,7 +130,7 @@ export default function AnalyticsPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
             {/* Jobs by contractor */}
             {data.jobs_by_contractor && Object.keys(data.jobs_by_contractor).length > 0 && (
               <div className="card">

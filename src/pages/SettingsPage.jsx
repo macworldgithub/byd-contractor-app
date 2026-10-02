@@ -2,11 +2,13 @@ import { useState } from 'react';
 import AppLayout from '../components/layout/AppLayout';
 import { authApi, integrationApi, pushApi } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import { Settings, Shield, RefreshCw, Key, Check, AlertCircle, Bell, BellOff } from 'lucide-react';
+import { usePWA } from '../contexts/PWAContext';
+import { Settings, RefreshCw, Key, Check, AlertCircle, Bell, BellOff, Smartphone, Download, Share, Wifi, CheckCircle2 } from 'lucide-react';
 import { formatDateTime, timeAgo } from '../utils/helpers';
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { canInstall, isInstalled, isIOS, isOnline, installApp } = usePWA();
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm: '' });
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMsg, setPwMsg] = useState('');
@@ -22,7 +24,7 @@ export default function SettingsPage() {
   // VAPID helper
   const urlB64ToUint8Array = (base64String) => {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
     const rawData = window.atob(base64);
     return new Uint8Array([...rawData].map(char => char.charCodeAt(0)));
   };
@@ -97,7 +99,7 @@ export default function SettingsPage() {
         <h1>Settings</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', maxWidth: 900 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem', maxWidth: 900 }}>
         {/* Account Info */}
         <div className="card">
           <div className="card-header">
@@ -180,6 +182,94 @@ export default function SettingsPage() {
                   {pushLoading ? 'Enabling...' : 'Enable Notifications'}
                 </button>
               </>
+            )}
+          </div>
+        </div>
+
+        {/* PWA & App Installation */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">App Installation &amp; PWA</span>
+            <Smartphone size={18} style={{ color: 'var(--text-muted)' }} />
+          </div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Install the BYD Contractor Hub directly to your device for standalone window mode, rapid offline caching, and push sync.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {/* Status indicator */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {isInstalled ? (
+                  <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+                ) : (
+                  <Smartphone size={18} style={{ color: '#f59e0b' }} />
+                )}
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {isInstalled ? 'Installed as App' : 'Browser Mode'}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    {isInstalled ? 'Running in standalone window mode' : 'Running inside web browser'}
+                  </div>
+                </div>
+              </div>
+              <span className={`badge ${isInstalled ? 'badge-completed' : 'badge-new'}`}>
+                {isInstalled ? 'Standalone' : 'Web'}
+              </span>
+            </div>
+
+            {/* Offline Cache Status */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Wifi size={18} style={{ color: isOnline ? '#10b981' : '#f59e0b' }} />
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {isOnline ? 'Online & Synced' : 'Offline Mode Active'}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Workbox caching &amp; indexed queue active
+                  </div>
+                </div>
+              </div>
+              <span className="badge badge-completed">Active</span>
+            </div>
+
+            {/* Action button / Instructions */}
+            {canInstall && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={installApp}
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <Download size={16} />
+                <span>Install App to Device</span>
+              </button>
+            )}
+
+            {!canInstall && !isInstalled && !isIOS && (
+              <div style={{ padding: '10px 12px', background: 'rgba(255, 255, 255, 0.04)', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-border)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Download size={14} style={{ color: '#ef4444' }} /> Desktop &amp; Web Installation:
+                </div>
+                On Chrome or Edge, click the <strong>Install</strong> icon in the address bar (top right) or open browser menu <strong>⋮ &gt; 'Install BYD Contractor'</strong>.
+              </div>
+            )}
+
+            {isIOS && !isInstalled && (
+              <div style={{ padding: '10px 12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(59, 130, 246, 0.25)', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                <div style={{ fontWeight: 600, color: '#60a5fa', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Share size={14} /> iOS Safari Installation:
+                </div>
+                Tap the <strong>Share</strong> button at the bottom of Safari, scroll down and tap <strong>'Add to Home Screen'</strong> ➕.
+              </div>
+            )}
+
+            {isInstalled && (
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0' }}>
+                ✓ PWA is active with full offline support and instant launch.
+              </div>
             )}
           </div>
         </div>

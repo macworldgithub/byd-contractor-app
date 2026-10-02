@@ -1,13 +1,15 @@
-import { Search, Bell, WifiOff, X, AlertTriangle, ChevronRight, ShieldAlert, CheckCircle } from 'lucide-react';
+import { Search, Bell, WifiOff, X, AlertTriangle, ChevronRight, ShieldAlert, CheckCircle, Download } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePWA } from '../../contexts/PWAContext';
 import { getInitials, timeAgo } from '../../utils/helpers';
 import { getQueueSize } from '../../utils/offlineQueue';
 import { jobsApi } from '../../api/client';
 
 export default function Topbar() {
   const { user } = useAuth();
+  const { canInstall, isInstalled, isIOS, installApp, setShowInstallBanner } = usePWA();
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -81,6 +83,18 @@ export default function Topbar() {
         </div>
 
         <div className="mobile-topbar-right">
+          {(canInstall || (isIOS && !isInstalled)) && (
+            <button
+              className="mobile-icon-btn"
+              onClick={canInstall ? installApp : () => setShowInstallBanner(true)}
+              aria-label="Install App"
+              title="Install BYD Contractor Hub"
+              style={{ color: '#ef4444' }}
+            >
+              <Download size={18} />
+            </button>
+          )}
+
           <button
             className="mobile-icon-btn"
             onClick={() => setSearchOpen((prev) => !prev)}
@@ -137,6 +151,19 @@ export default function Topbar() {
 
       {/* Desktop Topbar Actions */}
       <div className="topbar-actions desktop-only" style={{ position: 'relative' }}>
+        {(canInstall || (isIOS && !isInstalled)) && (
+          <button
+            type="button"
+            className="btn btn-outline btn-sm topbar-install-btn"
+            onClick={canInstall ? installApp : () => setShowInstallBanner(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '5px 10px', borderColor: 'rgba(239, 68, 68, 0.4)', color: '#f87171' }}
+            title="Install BYD Contractor Hub on your device"
+          >
+            <Download size={14} />
+            <span>Install App</span>
+          </button>
+        )}
+
         {!isOnline && (
           <div className="offline-badge">
             <WifiOff size={13} />
@@ -160,20 +187,7 @@ export default function Topbar() {
       {notifOpen && (
         <div
           ref={notifRef}
-          className="fade-in"
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            right: 16,
-            width: 360,
-            maxWidth: 'calc(100vw - 32px)',
-            background: 'var(--surface-card, #ffffff)',
-            borderRadius: 'var(--radius-lg, 12px)',
-            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.16)',
-            border: '1px solid var(--surface-border, rgba(0,0,0,0.08))',
-            zIndex: 9999,
-            overflow: 'hidden',
-          }}
+          className="topbar-notification-popover fade-in"
         >
           <div style={{
             display: 'flex',

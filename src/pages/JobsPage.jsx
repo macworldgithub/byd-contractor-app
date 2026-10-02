@@ -63,7 +63,7 @@ export default function JobsPage() {
     <AppLayout>
       <div className="page-header">
         <h1>Jobs</h1>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn btn-ghost btn-sm" onClick={loadJobs} title="Refresh jobs">
             <RefreshCw size={15} />
           </button>
@@ -83,7 +83,7 @@ export default function JobsPage() {
       {/* Filters */}
       <div className="filters-bar">
         {/* Search */}
-        <div style={{ position: 'relative', flex: '0 0 260px' }}>
+        <div className="filters-search-box">
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             id="jobs-search"
@@ -99,7 +99,6 @@ export default function JobsPage() {
         <select
           id="jobs-status-filter"
           className="form-select"
-          style={{ width: 160 }}
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
         >
@@ -110,7 +109,6 @@ export default function JobsPage() {
         <select
           id="jobs-priority-filter"
           className="form-select"
-          style={{ width: 140 }}
           value={priorityFilter}
           onChange={e => setPriorityFilter(e.target.value)}
         >
@@ -127,7 +125,7 @@ export default function JobsPage() {
         </button>
       </div>
 
-      {/* Jobs Table */}
+      {/* Jobs Table & Mobile Cards */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
           <div className="spinner lg" />
@@ -146,72 +144,129 @@ export default function JobsPage() {
           )}
         </div>
       ) : (
-        <div className="table-container fade-in">
-          <table>
-            <thead>
-              <tr>
-                <th>Model / VIN</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Contractor</th>
-                <th>Progress</th>
-                <th>Due Date</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map(job => {
-                const prog = taskProgress(job.checklist);
-                return (
-                  <tr
-                    key={job.id}
-                    onClick={() => navigate(`/jobs/${job.id}`)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{job.model_name}</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{job.last_6_vin} · {job.rego || '—'}</div>
-                      {job.issue_flag && (
-                        <span style={{ fontSize: '0.68rem', color: 'var(--byd-red)', fontWeight: 700 }}>⚠ ISSUE FLAGGED</span>
-                      )}
-                    </td>
-                    <td>
+        <>
+          {/* Desktop & Tablet Table */}
+          <div className="table-container fade-in jobs-desktop-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Model / VIN</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Contractor</th>
+                  <th>Progress</th>
+                  <th>Due Date</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map(job => {
+                  const prog = taskProgress(job.checklist);
+                  return (
+                    <tr
+                      key={job.id}
+                      onClick={() => navigate(`/jobs/${job.id}`)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{job.model_name}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{job.last_6_vin} · {job.rego || '—'}</div>
+                        {job.issue_flag && (
+                          <span style={{ fontSize: '0.68rem', color: 'var(--byd-red)', fontWeight: 700 }}>⚠ ISSUE FLAGGED</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`badge badge-${job.status}`}>
+                          {STATUS_LABELS[job.status] || job.status}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge badge-${job.priority}`}>
+                          {PRIORITY_LABELS[job.priority] || job.priority}
+                        </span>
+                      </td>
+                      <td style={{ color: job.assigned_contractor_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {job.assigned_contractor_name || 'Unassigned'}
+                      </td>
+                      <td>
+                        {job.checklist?.length > 0 ? (
+                          <div style={{ minWidth: 80 }}>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+                              {job.checklist.filter(t => t.completed).length}/{job.checklist.length}
+                            </div>
+                            <div className="progress-bar" style={{ width: 80 }}>
+                              <div className={`progress-fill${prog === 100 ? ' green' : ''}`} style={{ width: `${prog}%` }} />
+                            </div>
+                          </div>
+                        ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
+                      <td style={{ color: job.due_date ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {formatDate(job.due_date)}
+                      </td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        {timeAgo(job.updated_at)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card List (Instant Touch Experience for Contractors) */}
+          <div className="jobs-mobile-card-list fade-in">
+            {jobs.map(job => {
+              const prog = taskProgress(job.checklist);
+              return (
+                <div
+                  key={job.id}
+                  className={`job-mobile-card${job.is_urgent ? ' urgent' : ''}`}
+                  onClick={() => navigate(`/jobs/${job.id}`)}
+                >
+                  <div className="job-mobile-card-header">
+                    <div>
+                      <div className="job-mobile-card-title">{job.model_name}</div>
+                      <div className="job-mobile-card-vin">
+                        VIN: {job.last_6_vin || job.full_vin?.slice(-6) || '—'} {job.rego ? `· ${job.rego}` : ''}
+                      </div>
+                    </div>
+                    <div className="job-mobile-card-badges">
                       <span className={`badge badge-${job.status}`}>
                         {STATUS_LABELS[job.status] || job.status}
                       </span>
-                    </td>
-                    <td>
                       <span className={`badge badge-${job.priority}`}>
                         {PRIORITY_LABELS[job.priority] || job.priority}
                       </span>
-                    </td>
-                    <td style={{ color: job.assigned_contractor_name ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                      {job.assigned_contractor_name || 'Unassigned'}
-                    </td>
-                    <td>
-                      {job.checklist?.length > 0 ? (
-                        <div style={{ minWidth: 80 }}>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4 }}>
-                            {job.checklist.filter(t => t.completed).length}/{job.checklist.length}
-                          </div>
-                          <div className="progress-bar" style={{ width: 80 }}>
-                            <div className={`progress-fill${prog === 100 ? ' green' : ''}`} style={{ width: `${prog}%` }} />
-                          </div>
-                        </div>
-                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
-                    </td>
-                    <td style={{ color: job.due_date ? 'var(--text-primary)' : 'var(--text-muted)' }}>
-                      {formatDate(job.due_date)}
-                    </td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                      {timeAgo(job.updated_at)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+
+                  {job.issue_flag && (
+                    <div style={{ fontSize: '0.72rem', color: 'var(--byd-red)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      ⚠ ISSUE FLAGGED {job.issue_description ? `— ${job.issue_description}` : ''}
+                    </div>
+                  )}
+
+                  {job.checklist?.length > 0 && (
+                    <div style={{ marginTop: 2 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 2 }}>
+                        <span>Checklist Tasks</span>
+                        <span>{job.checklist.filter(t => t.completed).length} / {job.checklist.length} done</span>
+                      </div>
+                      <div className="progress-bar" style={{ height: 6, margin: 0 }}>
+                        <div className={`progress-fill${prog === 100 ? ' green' : ''}`} style={{ width: `${prog}%` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="job-mobile-card-meta">
+                    <span>👤 {job.assigned_contractor_name || 'Unassigned'}</span>
+                    <span>{job.due_date ? `Due ${formatDate(job.due_date)}` : `Updated ${timeAgo(job.updated_at)}`}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {showCreate && (

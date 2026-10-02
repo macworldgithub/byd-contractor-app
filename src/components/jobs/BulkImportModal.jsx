@@ -145,6 +145,9 @@ BYD Dolphin,LC0CE4EC8P000003,2026-10-18,normal,"Fit Dashcam;Wash & Vacuum",Stand
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal modal-lg">
+        <div className="mobile-handle-bar">
+          <div className="mobile-handle" />
+        </div>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Layers size={20} color="var(--byd-red)" />
@@ -207,7 +210,7 @@ BYD Dolphin,LC0CE4EC8P000003,2026-10-18,normal,"Fit Dashcam;Wash & Vacuum",Stand
           </div>
         ) : (
           <div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 className={`btn btn-sm ${activeTab === 'paste' ? 'btn-primary' : 'btn-ghost'}`}
                 onClick={() => setActiveTab('paste')}
@@ -221,7 +224,7 @@ BYD Dolphin,LC0CE4EC8P000003,2026-10-18,normal,"Fit Dashcam;Wash & Vacuum",Stand
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => setRawText(sampleCsv)}
-                style={{ marginLeft: 'auto', fontSize: '0.75rem' }}
+                style={{ fontSize: '0.75rem' }}
               >
                 Load Sample CSV
               </button>

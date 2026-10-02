@@ -79,7 +79,7 @@ export default function DashboardPage() {
             {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {isAdmin && (
             <button className="btn btn-ghost" onClick={() => navigate('/kanban')}>
               <Layers size={16} /> Kanban Board
@@ -93,19 +93,9 @@ export default function DashboardPage() {
 
       {/* Active Clock Banner */}
       {activeLog && (
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05))',
-          border: '1px solid rgba(16,185,129,0.25)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '1rem 1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '1.5rem',
-          gap: '1rem',
-        }}>
+        <div className="active-clock-banner">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', animation: 'pulseDot 2s infinite' }} />
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', animation: 'pulseDot 2s infinite', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>CURRENTLY CLOCKED IN</div>
               <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Job: {activeLog.job_id?.slice(-8)?.toUpperCase()}</div>
@@ -156,7 +146,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Two column grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? 'repeat(auto-fit, minmax(280px, 1fr))' : '1fr', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))' : '1fr', gap: '1.5rem' }}>
         {/* Recent Jobs */}
         <div className="card">
           <div className="card-header">
@@ -307,7 +297,7 @@ function EscalationQueue({ jobs, navigate }) {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '1rem' }}>
         {sections.map(({ label, color, items, icon }) => (
           <div key={label} style={{
             background: `${color}0d`, border: `1px solid ${color}30`,

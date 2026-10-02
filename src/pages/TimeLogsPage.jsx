@@ -59,6 +59,7 @@ export default function TimeLogsPage() {
           display: 'flex',
           alignItems: 'center',
           gap: '1rem',
+          flexWrap: 'wrap',
           marginBottom: '1.5rem',
         }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', animation: 'pulseDot 2s infinite' }} />

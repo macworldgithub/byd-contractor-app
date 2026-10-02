@@ -1,7 +1,69 @@
-import { precacheAndRoute } from 'workbox-precaching';
+import { clientsClaim } from 'workbox-core';
+import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
+import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { ExpirationPlugin } from 'workbox-expiration';
+
+// Ensure the new service worker activates and claims clients immediately
+self.skipWaiting();
+clientsClaim();
 
 // Precaching provided by VitePWA
 precacheAndRoute(self.__WB_MANIFEST || []);
+
+// Setup SPA navigation route so refreshing on /jobs, /kanban, etc. works 100% offline
+const handler = createHandlerBoundToURL('/index.html');
+const navigationRoute = new NavigationRoute(handler, {
+  denylist: [/^\/api\//, /\.[a-zA-Z0-9]+$/],
+});
+registerRoute(navigationRoute);
+
+// Cache Google Fonts stylesheets (Inter, Outfit)
+registerRoute(
+  /^https:\/\/fonts\.googleapis\.com\/.*/i,
+  new StaleWhileRevalidate({
+    cacheName: 'google-fonts-stylesheets',
+  })
+);
+
+// Cache Google Fonts webfont files (woff2, etc.) for 1 year
+registerRoute(
+  /^https:\/\/fonts\.gstatic\.com\/.*/i,
+  new CacheFirst({
+    cacheName: 'google-fonts-webfonts',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxAgeSeconds: 60 * 60 * 24 * 365,
+        maxEntries: 30,
+      }),
+    ],
+  })
+);
+
+// Cache images and icons
+registerRoute(
+  /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+  new StaleWhileRevalidate({
+    cacheName: 'images-cache',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 60,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 Days
+      }),
+    ],
+  })
+);
+
+// Listen for message events (e.g. manual skip waiting)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 // Listen for push events
 self.addEventListener('push', (event) => {

@@ -57,7 +57,7 @@ export default function TemplatesPage() {
           <button className="btn btn-primary" onClick={() => setShowCreate(true)}><Plus size={16} /> Create Template</button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }} className="fade-in">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1rem' }} className="fade-in">
           {templates.map(t => (
             <div key={t.id} className="card">
               <div className="card-header">

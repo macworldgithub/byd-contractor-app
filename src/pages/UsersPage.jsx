@@ -59,7 +59,7 @@ export default function UsersPage() {
       </div>
 
       {tempPassword && (
-        <div className="alert alert-warning" style={{ marginBottom: '1rem', justifyContent: 'space-between' }}>
+        <div className="alert alert-warning" style={{ marginBottom: '1rem', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <strong>Temporary Password:</strong>{' '}
             <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 4, letterSpacing: '0.1em' }}>
