@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Zap, Eye, EyeOff, AlertCircle, Activity, Camera, MapPin, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginPage() {
@@ -39,13 +39,15 @@ export default function LoginPage() {
 
           <div style={{ marginTop: '3rem', textAlign: 'left', maxWidth: 340 }}>
             {[
-              { icon: '⚡', text: 'Real-time job tracking and status updates' },
-              { icon: '📸', text: 'Photo & video evidence capture from the field' },
-              { icon: '📍', text: 'GPS location check-in per vehicle' },
-              { icon: '🔄', text: 'Two-way sync with deliverycentre.com.au' },
-            ].map(({ icon, text }) => (
+              { Icon: Activity, text: 'Real-time job tracking and status updates' },
+              { Icon: Camera, text: 'Photo & video evidence capture from the field' },
+              { Icon: MapPin, text: 'GPS location check-in per vehicle' },
+              { Icon: RefreshCw, text: 'Two-way sync with deliverycentre.goodshowroom.com' },
+            ].map(({ Icon, text }) => (
               <div key={text} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>{icon}</span>
+                <span style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <Icon size={18} color="var(--byd-red)" />
+                </span>
                 <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>{text}</span>
               </div>
             ))}
