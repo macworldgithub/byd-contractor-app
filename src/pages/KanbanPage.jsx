@@ -145,7 +145,7 @@ export default function KanbanPage() {
             <Filter size={15} style={{ color: 'var(--text-muted)' }} />
             <select
               className="form-select"
-              style={{ height: 36, fontSize: '0.82rem' }}
+              style={{ height: 54, fontSize: '0.82rem' }}
               value={filterContractor}
               onChange={(e) => setFilterContractor(e.target.value)}
             >
@@ -185,92 +185,95 @@ export default function KanbanPage() {
         )}
       </div>
 
-      {/* Mobile Stage Switcher Pills */}
-      <div className="kanban-mobile-tabs" role="tablist">
-        {STATUS_ORDER.map((status) => (
-          <button
-            key={status}
-            type="button"
-            className={`kanban-mobile-tab-btn ${activeMobileColumn === status ? 'active' : ''}`}
-            onClick={() => {
-              setActiveMobileColumn(status);
-              const el = document.getElementById(`kanban-col-${status}`);
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-              }
-            }}
-          >
-            <span className="column-dot" style={{ background: STATUS_DOT_COLORS[status] }} />
-            <span>{STATUS_LABELS[status]}</span>
-            <span style={{
-              background: activeMobileColumn === status ? 'var(--byd-red)' : 'var(--surface-3)',
-              color: activeMobileColumn === status ? '#ffffff' : 'var(--text-muted)',
-              fontSize: '0.68rem',
-              borderRadius: 999,
-              padding: '1px 6px',
-              fontWeight: 700
-            }}>
-              {jobsByStatus[status]?.length || 0}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
-          <div className="spinner lg" />
+      {/* Full-bleed scroll wrapper: breaks out of page-content padding */}
+      <div className="kanban-scroll-wrapper">
+        {/* Mobile Stage Switcher Pills */}
+        <div className="kanban-mobile-tabs" role="tablist">
+          {STATUS_ORDER.map((status) => (
+            <button
+              key={status}
+              type="button"
+              className={`kanban-mobile-tab-btn ${activeMobileColumn === status ? 'active' : ''}`}
+              onClick={() => {
+                setActiveMobileColumn(status);
+                const el = document.getElementById(`kanban-col-${status}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+              }}
+            >
+              <span className="column-dot" style={{ background: STATUS_DOT_COLORS[status] }} />
+              <span>{STATUS_LABELS[status]}</span>
+              <span style={{
+                background: activeMobileColumn === status ? 'var(--byd-red)' : 'var(--surface-3)',
+                color: activeMobileColumn === status ? '#ffffff' : 'var(--text-muted)',
+                fontSize: '0.68rem',
+                borderRadius: 999,
+                padding: '1px 6px',
+                fontWeight: 700
+              }}>
+                {jobsByStatus[status]?.length || 0}
+              </span>
+            </button>
+          ))}
         </div>
-      ) : (
-        <div className="kanban-board fade-in">
-          {STATUS_ORDER.map((status) => {
-            const isTarget = dragOverColumn === status;
-            return (
-              <div
-                key={status}
-                id={`kanban-col-${status}`}
-                className="kanban-column"
-                onDragOver={(e) => handleDragOver(e, status)}
-                onDragLeave={(e) => handleDragLeave(e, status)}
-                onDrop={(e) => handleDrop(e, status)}
-                style={{
-                  transition: 'background 0.15s ease, border-color 0.15s ease',
-                  background: isTarget ? 'rgba(225, 27, 34, 0.04)' : undefined,
-                  borderColor: isTarget ? 'var(--byd-red)' : undefined,
-                }}
-              >
-                <div className="kanban-column-header">
-                  <div className="kanban-column-title">
-                    <span className="column-dot" style={{ background: STATUS_DOT_COLORS[status] }} />
-                    {STATUS_LABELS[status]}
-                  </div>
-                  <span className="kanban-column-count">{jobsByStatus[status]?.length || 0}</span>
-                </div>
 
-                <div className="kanban-cards">
-                  {jobsByStatus[status]?.length === 0 ? (
-                    <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      {isTarget ? 'Drop here to update' : 'No jobs in this stage'}
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
+            <div className="spinner lg" />
+          </div>
+        ) : (
+          <div className="kanban-board fade-in">
+            {STATUS_ORDER.map((status) => {
+              const isTarget = dragOverColumn === status;
+              return (
+                <div
+                  key={status}
+                  id={`kanban-col-${status}`}
+                  className="kanban-column"
+                  onDragOver={(e) => handleDragOver(e, status)}
+                  onDragLeave={(e) => handleDragLeave(e, status)}
+                  onDrop={(e) => handleDrop(e, status)}
+                  style={{
+                    transition: 'background 0.15s ease, border-color 0.15s ease',
+                    background: isTarget ? 'rgba(225, 27, 34, 0.04)' : undefined,
+                    borderColor: isTarget ? 'var(--byd-red)' : undefined,
+                  }}
+                >
+                  <div className="kanban-column-header">
+                    <div className="kanban-column-title">
+                      <span className="column-dot" style={{ background: STATUS_DOT_COLORS[status] }} />
+                      {STATUS_LABELS[status]}
                     </div>
-                  ) : (
-                    jobsByStatus[status].map((job) => (
-                      <KanbanCard
-                        key={job.id}
-                        job={job}
-                        currentStatus={status}
-                        onView={() => navigate(`/jobs/${job.id}`)}
-                        onMove={handleMoveStatus}
-                        isMoving={movingJob === job.id}
-                        statusOrder={STATUS_ORDER}
-                        onDragStart={(e) => handleDragStart(e, job.id)}
-                      />
-                    ))
-                  )}
+                    <span className="kanban-column-count">{jobsByStatus[status]?.length || 0}</span>
+                  </div>
+
+                  <div className="kanban-cards">
+                    {jobsByStatus[status]?.length === 0 ? (
+                      <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                        {isTarget ? 'Drop here to update' : 'No jobs in this stage'}
+                      </div>
+                    ) : (
+                      jobsByStatus[status].map((job) => (
+                        <KanbanCard
+                          key={job.id}
+                          job={job}
+                          currentStatus={status}
+                          onView={() => navigate(`/jobs/${job.id}`)}
+                          onMove={handleMoveStatus}
+                          isMoving={movingJob === job.id}
+                          statusOrder={STATUS_ORDER}
+                          onDragStart={(e) => handleDragStart(e, job.id)}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>{/* end kanban-scroll-wrapper */}
 
       {showCreate && (
         <CreateJobModal
