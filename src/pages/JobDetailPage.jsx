@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Clock, MapPin, Camera, AlertTriangle, CheckCircle,
@@ -7,11 +7,11 @@ import {
 } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import {
-  jobsApi, tasksApi, timeApi, evidenceApi,
-  locationApi, activityApi, contractorsApi
+  jobsApi, timeApi, evidenceApi,
+  locationApi, activityApi, contractorsApi, offlineApi
 } from '../api/client';
 import { useAuth, useIsAdmin } from '../contexts/AuthContext';
-import { addToQueue } from '../utils/offlineQueue';
+import { addToQueue, getQueue, flushOfflineQueue } from '../utils/offlineQueue';
 import {
   STATUS_LABELS, STATUS_ORDER, PRIORITY_LABELS,
   formatDate, formatDateTime, formatDuration, timeAgo, taskProgress, getInitials
@@ -39,8 +39,6 @@ export default function JobDetailPage() {
   const [evidenceStage, setEvidenceStage] = useState('before');
   const [locationLoading, setLocationLoading] = useState(false);
   const [customBay, setCustomBay] = useState('');
-  const [taskTimers, setTaskTimers] = useState({}); // { taskId: { running, startTs, accumulated } }
-  const taskTimerRefs = useRef({});
 
   const reload = async () => {
     try {
@@ -57,8 +55,16 @@ export default function JobDetailPage() {
       setTimeLogs(Array.isArray(tlData) ? tlData : []);
       setLocationHistory(Array.isArray(locData) ? locData : []);
 
-      const openLog = tlData?.find?.(l => !l.clock_out);
-      setActiveLog(openLog || null);
+      let openLog = tlData?.find?.(l => !l.clock_out && l.contractor_id === user?.id) || null;
+      const pending = (await getQueue()).filter(a => a.job_id === id);
+      const projected = { ...jobData, checklist: [...(jobData.checklist || [])] };
+      for (const action of pending) {
+        if (action.action_type === 'clock_in') openLog = { clock_in: action.queued_at, task_id: action.payload.task_id, contractor_id: user?.id, contractor_name: user?.name, job_id: id };
+        if (action.action_type === 'clock_out') openLog = null;
+        if (action.action_type === 'update_task') projected.checklist = projected.checklist.map(t => t.id === action.payload.task_id ? { ...t, completed: action.payload.completed } : t);
+      }
+      setJob(projected);
+      setActiveLog(openLog);
     } catch (e) {
       console.error(e);
     }
@@ -70,6 +76,14 @@ export default function JobDetailPage() {
     if (isAdmin) contractorsApi.list().then(setContractors).catch(() => {});
   }, [id]);
 
+  useEffect(() => {
+    const refresh = () => { if (navigator.onLine && document.visibilityState !== 'hidden') reload(); };
+    const interval = setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('byd-sync-complete', refresh);
+    return () => { clearInterval(interval); window.removeEventListener('focus', refresh); window.removeEventListener('byd-sync-complete', refresh); };
+  }, [id, user?.id]);
+
   // Live clock timer
   useEffect(() => {
     if (!activeLog?.clock_in) { setElapsed(0); return; }
@@ -80,68 +94,31 @@ export default function JobDetailPage() {
     return () => clearInterval(interval);
   }, [activeLog]);
 
-  const isOfflineError = (err) =>
-    !navigator.onLine ||
-    err?.message === 'Offline' ||
-    err?.message?.toLowerCase().includes('failed to fetch') ||
-    err?.message?.toLowerCase().includes('networkerror');
-
-  const handleClockIn = async () => {
-    setActionLoading('clock');
+  const saveAction = async (action) => {
+    setActionLoading('saving');
     try {
-      if (!navigator.onLine) throw new Error('Offline');
-      await timeApi.clockIn(id);
-      await reload();
-    } catch (e) {
-      if (isOfflineError(e)) {
-        addToQueue({ action_type: 'clock_in', job_id: id, payload: { task_id: null } });
-        setActiveLog({ clock_in: new Date().toISOString(), contractor_name: user?.name, job_id: id });
-        alert('Clock-in saved offline. Will sync automatically when connected.');
-      } else {
-        alert(e.message);
+      await addToQueue({ ...action, job_id: id });
+      if (navigator.onLine) {
+        const result = await flushOfflineQueue(offlineApi, evidenceApi);
+        if (result?.failed) alert('Saved on this device. Sync needs attention; see Settings > Pending work.');
       }
-    }
-    setActionLoading('');
+      await reload();
+      return true;
+    } catch (error) {
+      alert(`Work could not be saved: ${error.message}`);
+      return false;
+    } finally { setActionLoading(''); }
   };
 
+  const handleClockIn = async (taskId = null) => {
+    if (typeof taskId !== 'string') taskId = null;
+    await saveAction({ action_type: 'clock_in', payload: { task_id: taskId } });
+  };
   const handleClockOut = async () => {
-    setActionLoading('clock');
-    try {
-      if (!navigator.onLine) throw new Error('Offline');
-      await timeApi.clockOut(id);
-      await reload();
-    } catch (e) {
-      if (isOfflineError(e)) {
-        addToQueue({ action_type: 'clock_out', job_id: id, payload: {} });
-        setActiveLog(null);
-        alert('Clock-out saved offline. Will sync automatically when connected.');
-      } else {
-        alert(e.message);
-      }
-    }
-    setActionLoading('');
+    await saveAction({ action_type: 'clock_out', payload: {} });
   };
-
   const handleTaskToggle = async (task) => {
-    const nextCompleted = !task.completed;
-    // Optimistic UI update
-    setJob(prev => prev ? ({
-      ...prev,
-      checklist: prev.checklist.map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t)
-    }) : prev);
-
-    try {
-      if (!navigator.onLine) throw new Error('Offline');
-      await tasksApi.update(id, task.id, { completed: nextCompleted });
-      await reload();
-    } catch (e) {
-      if (isOfflineError(e)) {
-        addToQueue({ action_type: 'update_task', job_id: id, payload: { task_id: task.id, completed: nextCompleted } });
-      } else {
-        alert(e.message);
-        await reload();
-      }
-    }
+    await saveAction({ action_type: 'update_task', payload: { task_id: task.id, completed: !task.completed } });
   };
 
   const handleStatusChange = async (newStatus) => {
@@ -152,42 +129,11 @@ export default function JobDetailPage() {
 
   const handleComment = async (e) => {
     e.preventDefault();
-    if (!comment.trim()) return;
-    const msg = comment;
-    setComment('');
-    try {
-      if (!navigator.onLine) throw new Error('Offline');
-      await activityApi.addComment(id, msg);
-      await reload();
-    } catch (e) {
-      if (isOfflineError(e)) {
-        addToQueue({ action_type: 'add_comment', job_id: id, payload: { message: msg } });
-        alert('Comment queued offline.');
-      } else {
-        alert(e.message);
-      }
-    }
+    if (comment.trim() && await saveAction({ action_type: 'add_comment', payload: { message: comment } })) setComment('');
   };
-
   const handleFlagIssue = async () => {
     if (!issueText.trim()) { alert('Please describe the issue'); return; }
-    const text = issueText;
-    setActionLoading('flag');
-    try {
-      if (!navigator.onLine) throw new Error('Offline');
-      await activityApi.flagIssue(id, text, true, []);
-      setIssueText('');
-      await reload();
-    } catch (e) {
-      if (isOfflineError(e)) {
-        addToQueue({ action_type: 'flag_issue', job_id: id, payload: { description: text, is_urgent: true } });
-        setIssueText('');
-        alert('Issue flagged offline. Will sync when back online.');
-      } else {
-        alert(e.message);
-      }
-    }
-    setActionLoading('');
+    if (await saveAction({ action_type: 'flag_issue', payload: { description: issueText, is_urgent: true } })) setIssueText('');
   };
 
   const handleResolveIssue = async () => {
@@ -199,96 +145,16 @@ export default function JobDetailPage() {
   const handleEvidenceUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setActionLoading('evidence');
-
-    const queueOfflineUpload = (fileObj) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        addToQueue({
-          action_type: 'upload_evidence',
-          job_id: id,
-          payload: {
-            stage: evidenceStage,
-            caption: '',
-            fileName: fileObj.name,
-            fileType: fileObj.type,
-            fileData: reader.result,
-          }
-        });
-        alert('Offline: Photo/video queued. It will upload automatically once you reconnect.');
-      };
-      reader.readAsDataURL(fileObj);
-    };
-
-    if (!navigator.onLine) {
-      queueOfflineUpload(file);
-      e.target.value = '';
-      setActionLoading('');
-      return;
-    }
-
-    try {
-      await evidenceApi.upload(id, file, evidenceStage, '');
-      await reload();
-      e.target.value = '';
-    } catch (err) {
-      if (isOfflineError(err)) {
-        queueOfflineUpload(file);
-        e.target.value = '';
-      } else {
-        alert(err.message);
-      }
-    }
-    setActionLoading('');
+    if (file.size > 100 * 1024 * 1024) { alert('Choose a photo or video under 100 MB.'); return; }
+    if (await saveAction({ action_type: 'upload_evidence', payload: { stage: evidenceStage, caption: '', file } })) e.target.value = '';
   };
 
-  // ----- Per-task timer helpers with backend persistence -----
-  const getTaskElapsed = (taskId, baseSec = 0) => {
-    const t = taskTimers[taskId];
-    const base = t ? t.accumulated : (baseSec || 0);
-    if (t?.running) return base + Math.floor((Date.now() - t.startTs) / 1000);
-    return base;
-  };
-
+  // Restore task timers from the server session or pending offline clock actions.
+  const getTaskElapsed = (taskId, baseSec = 0) => (baseSec || 0) + (activeLog?.task_id === taskId ? elapsed : 0);
   const toggleTaskTimer = async (taskId) => {
-    const isRunning = taskTimers[taskId]?.running;
-    if (isRunning) {
-      // Stop and clock out
-      setTaskTimers(prev => ({
-        ...prev,
-        [taskId]: {
-          running: false,
-          startTs: null,
-          accumulated: (prev[taskId]?.accumulated || 0) + Math.floor((Date.now() - prev[taskId].startTs) / 1000)
-        }
-      }));
-      try {
-        await timeApi.clockOut(id);
-        await reload();
-      } catch (err) {
-        console.warn('Task clock out sync error:', err);
-      }
-    } else {
-      // Start and clock in with task_id
-      setTaskTimers(prev => ({
-        ...prev,
-        [taskId]: {
-          running: true,
-          startTs: Date.now(),
-          accumulated: prev[taskId]?.accumulated || 0
-        }
-      }));
-      try {
-        await timeApi.clockIn(id, taskId, 'Started task');
-        await reload();
-      } catch (err) {
-        console.warn('Task clock in sync error:', err);
-      }
-    }
-  };
-
-  const resetTaskTimer = (taskId) => {
-    setTaskTimers(prev => ({ ...prev, [taskId]: { running: false, startTs: null, accumulated: 0 } }));
+    if (activeLog?.task_id === taskId) await handleClockOut();
+    else if (activeLog) alert('Clock out of the current session before starting another task.');
+    else await handleClockIn(taskId);
   };
 
   const handleLocationCheckIn = () => {
@@ -297,22 +163,9 @@ export default function JobDetailPage() {
 
     const saveLoc = async (data) => {
       try {
-        if (!navigator.onLine) throw new Error('Offline');
-        await locationApi.checkIn(id, data);
-        await reload();
-        setCustomBay('');
-        alert('Location checked in successfully!');
-      } catch (e) {
-        if (isOfflineError(e)) {
-          addToQueue({ action_type: 'location_checkin', job_id: id, payload: data });
-          setCustomBay('');
-          alert('Location saved offline. Will sync when connection is restored.');
-        } else {
-          alert(e.message);
-        }
-      } finally {
-        setLocationLoading(false);
-      }
+        if (await saveAction({ action_type: 'location_checkin', payload: data })) setCustomBay('');
+      } finally { setLocationLoading(false); }
+
     };
 
     if (navigator.geolocation) {
@@ -424,7 +277,7 @@ export default function JobDetailPage() {
             <button
               className="clock-btn clock-out"
               onClick={handleClockOut}
-              disabled={actionLoading === 'clock'}
+              disabled={!!actionLoading}
             >
               <Clock size={24} />
               <div style={{ textAlign: 'left' }}>
@@ -436,7 +289,7 @@ export default function JobDetailPage() {
             <button
               className="clock-btn clock-in"
               onClick={handleClockIn}
-              disabled={actionLoading === 'clock'}
+              disabled={!!actionLoading}
             >
               <Clock size={24} />
               Clock In
@@ -626,9 +479,9 @@ export default function JobDetailPage() {
               task={task}
               onToggle={() => handleTaskToggle(task)}
               elapsed={getTaskElapsed(task.id, task.duration_seconds)}
-              timerRunning={taskTimers[task.id]?.running || false}
+              timerRunning={activeLog?.task_id === task.id}
               onTimerToggle={() => toggleTaskTimer(task.id)}
-              onTimerReset={() => resetTaskTimer(task.id)}
+              onTimerReset={null}
             />
           ))}
         </div>
@@ -659,7 +512,7 @@ export default function JobDetailPage() {
                 accept="image/*"
                 capture="environment"
                 onChange={handleEvidenceUpload}
-                disabled={actionLoading === 'evidence'}
+                disabled={!!actionLoading}
                 style={{ display: 'none' }}
               />
             </label>
@@ -673,7 +526,7 @@ export default function JobDetailPage() {
                 accept="video/*"
                 capture="environment"
                 onChange={handleEvidenceUpload}
-                disabled={actionLoading === 'evidence'}
+                disabled={!!actionLoading}
                 style={{ display: 'none' }}
               />
             </label>
@@ -818,11 +671,11 @@ export default function JobDetailPage() {
           {isAdmin && (
             <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
               {activeLog ? (
-                <button className="btn btn-danger" onClick={handleClockOut} disabled={actionLoading === 'clock'}>
+                <button className="btn btn-danger" onClick={handleClockOut} disabled={!!actionLoading}>
                   <Clock size={16} /> Clock Out ({formatDuration(elapsed)})
                 </button>
               ) : (
-                <button className="btn btn-primary" onClick={handleClockIn} disabled={actionLoading === 'clock'}>
+                <button className="btn btn-primary" onClick={handleClockIn} disabled={!!actionLoading}>
                   <Clock size={16} /> Clock In
                 </button>
               )}
@@ -1094,7 +947,7 @@ function TaskTimerItem({ task, onToggle, elapsed, timerRunning, onTimerToggle, o
           {timerRunning ? <StopCircle size={13} /> : <Timer size={13} />}
           {timerRunning ? 'Stop' : 'Timer'}
         </button>
-        {totalSecs > 0 && !timerRunning && (
+        {onTimerReset && totalSecs > 0 && !timerRunning && (
           <button
             onClick={onTimerReset}
             title="Reset timer"

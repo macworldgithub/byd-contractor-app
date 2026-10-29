@@ -1,3 +1,5 @@
+import { useIsAdmin } from '../contexts/AuthContext';
+import useLiveRefresh from '../hooks/useLiveRefresh';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, AlertCircle, Clock, Calendar, Filter } from 'lucide-react';
@@ -18,6 +20,7 @@ import CreateJobModal from '../components/jobs/CreateJobModal';
 
 export default function KanbanPage() {
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -30,11 +33,11 @@ export default function KanbanPage() {
 
   const [activeMobileColumn, setActiveMobileColumn] = useState('requested');
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [jData, cData] = await Promise.all([
-        jobsApi.list({ limit: 500 }),
+        jobsApi.listAll(),
         contractorsApi.list().catch(() => []),
       ]);
       setJobs(Array.isArray(jData) ? jData : []);
@@ -48,6 +51,8 @@ export default function KanbanPage() {
   useEffect(() => {
     load();
   }, []);
+
+  useLiveRefresh(load);
 
   const handleMoveStatus = async (jobId, newStatus) => {
     if (!jobId || !newStatus) return;
@@ -121,7 +126,7 @@ export default function KanbanPage() {
           <h1>Kanban Board</h1>
           <p className="page-sub">Drag and drop jobs across workflow stages or filter by contractor &amp; urgency.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+        <button hidden={!isAdmin} className="btn btn-primary" onClick={() => isAdmin && setShowCreate(true)}>
           <Plus size={16} /> New Job
         </button>
       </div>

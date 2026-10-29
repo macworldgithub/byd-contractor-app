@@ -1,10 +1,11 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com';
-export const DELIVERY_CENTRE_URL = import.meta.env.VITE_DELIVERY_CENTRE_URL || 'https://deliverycentre.goodshowroom.com';
+import { cacheResponse, cachedResponse, accountId } from '../utils/offlineStore.js';
+const BASE_URL = import.meta.env?.VITE_API_URL || 'https://byd-panel.omnisuiteai.com';
+export const DELIVERY_CENTRE_URL = import.meta.env?.VITE_DELIVERY_CENTRE_URL || 'https://deliverycentre.goodshowroom.com';
 
 // ---- Auth helpers ----
 export const getToken = () => localStorage.getItem('byd_token');
 export const setToken = (t) => localStorage.setItem('byd_token', t);
-export const removeToken = () => localStorage.removeItem('byd_token');
+export const removeToken = () => { localStorage.removeItem('byd_token'); localStorage.removeItem('byd_user'); };
 
 // ---- Core fetch wrapper ----
 async function request(method, path, body, isFormData = false) {
@@ -14,16 +15,26 @@ async function request(method, path, body, isFormData = false) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (!isFormData) headers['Content-Type'] = 'application/json';
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: isFormData ? body : body ? JSON.stringify(body) : undefined,
-  });
+  const owner = accountId();
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method, headers,
+      body: isFormData ? body : body ? JSON.stringify(body) : undefined,
+    });
+  } catch (error) {
+    if (method === 'GET' && owner === accountId()) {
+      const cached = await cachedResponse(path, owner).catch(() => undefined);
+      if (cached !== undefined) return cached;
+    }
+    throw error;
+  }
+  if (owner !== accountId()) throw new Error('Account changed. Reload this page.');
 
   if (res.status === 401) {
     removeToken();
     window.location.href = '/login';
-    return;
+    throw new Error('Session expired. Sign in again.');
   }
 
   if (!res.ok) {
@@ -32,7 +43,9 @@ async function request(method, path, body, isFormData = false) {
   }
 
   if (res.status === 204) return null;
-  return res.json();
+  const data = await res.json();
+  if (method === 'GET') await cacheResponse(path, data, owner).catch(() => {});
+  return data;
 }
 
 // Convenience wrappers
@@ -63,6 +76,14 @@ export const jobsApi = {
     const q = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v); });
     return api.get(`/api/contractor/jobs?${q.toString()}`);
+  },
+  listAll: async (params = {}) => {
+    const all = [];
+    for (let skip = 0; ; skip += 1000) {
+      const page = await jobsApi.list({ ...params, limit: 1000, skip });
+      all.push(...page);
+      if (page.length < 1000) return all;
+    }
   },
   get: (id) => api.get(`/api/contractor/jobs/${id}`),
   create: (data) => api.post('/api/contractor/jobs', data),
@@ -96,6 +117,14 @@ export const timeApi = {
     api.post(`/api/contractor/jobs/${jobId}/clock-out`, { notes }),
   getLogs: (jobId) =>
     api.get(`/api/contractor/jobs/${jobId}/time-logs`),
+  list: async (params = {}) => {
+    const all = [];
+    for (let skip = 0; ; skip += 1000) {
+      const page = await api.get(`/api/contractor/time-logs?${new URLSearchParams({ ...params, skip, limit: 1000 })}`);
+      all.push(...page);
+      if (page.length < 1000) return all;
+    }
+  },
   getActive: () =>
     api.get('/api/contractor/time-logs/active'),
 };
@@ -104,10 +133,12 @@ export const timeApi = {
 // Evidence (Photos/Videos)
 // ============================================================
 export const evidenceApi = {
-  upload: (jobId, file, stage, caption) => {
+  upload: (jobId, file, stage, caption, actionId, capturedAt) => {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('stage', stage);
+    if (actionId) fd.append('client_action_id', actionId);
+    if (capturedAt) fd.append('captured_at', capturedAt);
     if (caption) fd.append('caption', caption);
     return api.postForm(`/api/contractor/jobs/${jobId}/evidence`, fd);
   },
@@ -193,12 +224,12 @@ export const adminApi = {
     const q = new URLSearchParams();
     if (role) q.set('role', role);
     if (active_only) q.set('active_only', 'true');
-    return api.get(`/api/admin/users?${q.toString()}`);
+    return api.get(`/api/contractor/users?${q.toString()}`);
   },
-  createUser: (data) => api.post('/api/admin/users', data),
-  updateUser: (uid, data) => api.patch(`/api/admin/users/${uid}`, data),
-  resetPassword: (uid) => api.post(`/api/admin/users/${uid}/reset-password`),
-  deactivateUser: (uid) => api.delete(`/api/admin/users/${uid}`),
+  createUser: (data) => api.post('/api/contractor/users', data),
+  updateUser: (uid, data) => api.patch(`/api/contractor/users/${uid}`, data),
+  resetPassword: (uid) => api.post(`/api/contractor/users/${uid}/reset-password`),
+  deactivateUser: (uid) => api.delete(`/api/contractor/users/${uid}`),
   auditLog: (limit = 100) => api.get(`/api/admin/audit?limit=${limit}`),
 };
 

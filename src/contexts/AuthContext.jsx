@@ -1,3 +1,4 @@
+import { accountId } from '../utils/offlineStore';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authApi, getToken, setToken, removeToken } from '../api/client';
 
@@ -7,12 +8,24 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const remember = (current) => {
+    localStorage.setItem('byd_user', JSON.stringify(current));
+    setUser(current);
+  };
+
   useEffect(() => {
     const token = getToken();
     if (token) {
+      let expired = true;
+      try { expired = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000 <= Date.now(); } catch { /* Invalid token */ }
+      if (expired) { removeToken(); setLoading(false); return; }
       authApi.me()
-        .then(setUser)
-        .catch(() => { removeToken(); })
+        .then(remember)
+        .catch((error) => {
+          if (navigator.onLine && !(error instanceof TypeError)) { removeToken(); setUser(null); return; }
+          // A network outage must not destroy an otherwise valid offline session.
+          try { const cached = JSON.parse(localStorage.getItem('byd_user') || 'null'); setUser(cached?.id === accountId() ? cached : null); } catch { setUser(null); }
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -21,8 +34,9 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const data = await authApi.login(email, password);
+    if (!['contractor', 'admin', 'super_admin', 'site_admin'].includes(data.user?.role)) throw new Error('This account does not have contractor app access.');
     setToken(data.access_token);
-    setUser(data.user);
+    remember(data.user);
     return data.user;
   };
 
@@ -46,7 +60,7 @@ export const useAuth = () => {
 
 export const useIsAdmin = () => {
   const { user } = useAuth();
-  return user?.role === 'admin' || user?.role === 'super_admin';
+  return ['admin', 'super_admin', 'site_admin'].includes(user?.role);
 };
 
 export const useIsSuperAdmin = () => {

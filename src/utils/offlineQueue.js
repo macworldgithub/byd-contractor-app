@@ -1,134 +1,95 @@
-// Offline sync queue persisted in localStorage
-const QUEUE_KEY = 'byd_offline_queue';
+import { accountId, storeRecord, listRecords, deleteRecord, encryptFile, decryptFile } from './offlineStore.js';
 
-export function getQueue() {
-  try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-  } catch {
-    return [];
+const prefix = owner => `${owner}:queue:`;
+const countKey = owner => `byd_queue_count:${owner}`;
+async function updateCount(owner) {
+  const records = await listRecords(prefix(owner));
+  localStorage.setItem(countKey(owner), String(records.length));
+  window.dispatchEvent(new Event('byd-queue-change'));
+}
+
+export async function getQueue(owner = accountId()) {
+  if (!owner) return [];
+  return (await listRecords(prefix(owner))).map(r => r.value).sort((a, b) => (a.order || Date.parse(a.queued_at)) - (b.order || Date.parse(b.queued_at)));
+}
+
+export async function addToQueue(action) {
+  const owner = accountId();
+  if (!owner) throw new Error('Sign in before saving offline work.');
+  const queued_at = new Date().toISOString();
+  const order = performance.timeOrigin + performance.now();
+  const payload = { ...action.payload };
+  if (payload.file) {
+    Object.assign(payload, await encryptFile(payload.file, owner));
+    delete payload.file;
   }
-}
-
-export function addToQueue(action) {
-  const queue = getQueue();
-  queue.push({
-    ...action,
-    client_action_id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    queued_at: new Date().toISOString(),
-  });
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-}
-
-export function clearQueue() {
-  localStorage.removeItem(QUEUE_KEY);
+  const entry = { ...action, payload, user_id: owner, client_action_id: crypto.randomUUID(), queued_at, order };
+  await storeRecord(prefix(owner) + entry.client_action_id, entry);
+  await updateCount(owner);
+  navigator.storage?.persist?.().catch(() => {});
+  return entry;
 }
 
 export function getQueueSize() {
-  return getQueue().length;
+  return Number(localStorage.getItem(countKey(accountId())) || 0);
 }
 
-export function removeFromQueue(actionIds = []) {
-  if (!actionIds.length) return;
-  const idSet = new Set(actionIds);
-  const remaining = getQueue().filter(item => !idSet.has(item.client_action_id));
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
+export async function removeFromQueue(ids, owner = accountId()) {
+  await Promise.all(ids.map(id => deleteRecord(prefix(owner) + id)));
+  await updateCount(owner);
 }
 
-let isFlushing = false;
+export async function clearQueue() {
+  const owner = accountId();
+  await removeFromQueue((await getQueue(owner)).map(a => a.client_action_id), owner);
+}
 
+let flushing = false;
 export async function flushOfflineQueue(offlineApi, evidenceApi) {
-  if (isFlushing) return null;
-  const queue = getQueue();
-  if (!queue.length) return { processed: 0, succeeded: 0, failed: 0 };
-
-  isFlushing = true;
+  if (flushing || !navigator.onLine) return null;
+  flushing = true;
+  const owner = accountId();
   let succeeded = 0;
   let failed = 0;
-
   try {
-    // 1. Separate evidence upload actions from standard batch actions
-    const standardActions = [];
-    const evidenceActions = [];
-
-    for (const item of queue) {
-      if (item.action_type === 'upload_evidence') {
-        evidenceActions.push(item);
-      } else {
-        standardActions.push(item);
-      }
-    }
-
-    // 2. Process standard actions via offlineApi.sync
-    if (standardActions.length > 0 && offlineApi) {
+    const queue = await getQueue(owner);
+    // Preserve action order; stop if a prerequisite such as clock-in fails.
+    for (const action of queue) {
+      if (owner !== accountId()) break;
       try {
-        const res = await offlineApi.sync(standardActions);
-        if (res && Array.isArray(res.results)) {
-          const succeededIds = res.results
-            .filter(r => r.success)
-            .map(r => r.client_action_id);
-          removeFromQueue(succeededIds);
-          succeeded += succeededIds.length;
-          failed += (standardActions.length - succeededIds.length);
-        } else if (res && res.succeeded > 0) {
-          removeFromQueue(standardActions.map(a => a.client_action_id));
-          succeeded += standardActions.length;
+        if (action.action_type === 'upload_evidence') {
+          const file = await decryptFile(action.payload, owner);
+          await evidenceApi.upload(action.job_id, file, action.payload.stage, action.payload.caption, action.client_action_id, action.queued_at);
+        } else {
+          const result = await offlineApi.sync([action]);
+          const applied = result?.results?.find(r => r.client_action_id === action.client_action_id);
+          if (!applied?.success) throw new Error(applied?.message || 'Sync did not acknowledge this action');
         }
-      } catch (syncErr) {
-        console.warn('[OfflineQueue] Batch sync error:', syncErr);
-        failed += standardActions.length;
+        await removeFromQueue([action.client_action_id], owner);
+        succeeded++;
+      } catch (error) {
+        failed++;
+        await storeRecord(prefix(owner) + action.client_action_id, { ...action, last_error: error.message });
+        break;
       }
     }
-
-    // 3. Process queued evidence photo/video uploads
-    if (evidenceActions.length > 0 && evidenceApi) {
-      for (const evItem of evidenceActions) {
-        try {
-          const { stage, caption, fileName, fileType, fileData } = evItem.payload || {};
-          if (fileData) {
-            const blobRes = await fetch(fileData);
-            const blob = await blobRes.blob();
-            const file = new File([blob], fileName || 'evidence.jpg', { type: fileType || 'image/jpeg' });
-            await evidenceApi.upload(evItem.job_id, file, stage || 'before', caption || '');
-            removeFromQueue([evItem.client_action_id]);
-            succeeded++;
-          }
-        } catch (evErr) {
-          console.warn('[OfflineQueue] Evidence upload error:', evErr);
-          failed++;
-        }
-      }
-    }
-
-    return { processed: queue.length, succeeded, failed };
-  } catch (err) {
-    console.warn('[OfflineQueue] Flush failed (will retry on next reconnection):', err);
-    return null;
-  } finally {
-    isFlushing = false;
-  }
+    return { succeeded, failed };
+  } finally { flushing = false; }
 }
 
 export function initOfflineSync(offlineApi, evidenceApi, onSyncComplete) {
   const handler = async () => {
-    if (navigator.onLine && getQueueSize() > 0) {
+    if (!navigator.onLine) return;
+    try {
       const result = await flushOfflineQueue(offlineApi, evidenceApi);
-      if (result && result.succeeded > 0 && typeof onSyncComplete === 'function') {
-        onSyncComplete(result);
+      if (result?.succeeded) {
+        window.dispatchEvent(new Event('byd-sync-complete'));
+        onSyncComplete?.(result);
       }
-    }
+    } catch (error) { console.warn('Offline sync will retry:', error.message); }
   };
-
   window.addEventListener('online', handler);
-  // Periodic background check every 30s
   const interval = setInterval(handler, 30000);
-
-  // Initial trigger if online
-  if (navigator.onLine && getQueueSize() > 0) {
-    handler();
-  }
-
-  return () => {
-    window.removeEventListener('online', handler);
-    clearInterval(interval);
-  };
+  handler();
+  return () => { window.removeEventListener('online', handler); clearInterval(interval); };
 }

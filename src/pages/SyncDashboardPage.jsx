@@ -14,13 +14,13 @@ export default function SyncDashboardPage() {
   const [retrying, setRetrying] = useState({});
   const [expanded, setExpanded] = useState({});
   const [lastRefresh, setLastRefresh] = useState(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const load = useCallback(async () => {
     try {
       const [status, jobs] = await Promise.all([
         integrationApi.syncStatus().catch(() => null),
-        jobsApi.list({ limit: 50 }),
+        jobsApi.listAll(),
       ]);
       setSyncStatus(status);
       setRecentJobs(Array.isArray(jobs) ? jobs : []);
@@ -58,6 +58,7 @@ export default function SyncDashboardPage() {
     setPollBanner(null);
     try {
       const res = await integrationApi.poll();
+      if (res.status === 'error') throw new Error(res.error || 'Polling failed');
       setPollBanner(res);
       await load();
     } catch (e) { alert(`Polling sync failed: ${e.message}`); }
@@ -66,9 +67,9 @@ export default function SyncDashboardPage() {
 
   const toggleExpanded = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
-  const isJobSynced = (j) => j.sync_status === 'synced' || (Boolean(j.client_id || j.dc_job_id) && j.sync_status !== 'failed' && !j.sync_error);
-  const isJobFailed = (j) => j.sync_status === 'failed' || Boolean(j.sync_error);
-  const isJobPending = (j) => j.sync_status === 'pending' && !isJobSynced(j) && !isJobFailed(j);
+  const isJobFailed = j => j.sync_status === 'failed' || (syncStatus?.outbound_configured && j.outbound_sync_status === 'failed');
+  const isJobPending = j => !isJobFailed(j) && (j.sync_status === 'pending' || (syncStatus?.outbound_configured && ['pending', 'retry', 'sending'].includes(j.outbound_sync_status)));
+  const isJobSynced = j => !isJobFailed(j) && !isJobPending(j) && j.sync_status === 'synced' && (!syncStatus?.outbound_configured || j.outbound_sync_status === 'delivered');
 
   const synced = recentJobs.filter(isJobSynced);
   const failed = recentJobs.filter(isJobFailed);
@@ -185,7 +186,7 @@ export default function SyncDashboardPage() {
                     <td style={{ fontWeight: 600 }}>{job.model_name}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{job.full_vin || job.last_6_vin}</td>
                     <td><span className={`badge badge-${job.status}`}>{job.status}</span></td>
-                    <td style={{ fontSize: '0.78rem', color: '#ef4444', maxWidth: 200 }}>{job.sync_error || 'Unknown error'}</td>
+                    <td style={{ fontSize: '0.78rem', color: '#ef4444', maxWidth: 200 }}>{job.outbound_sync_error || job.sync_error || 'Unknown error'}</td>
                     <td>
                       <button className="btn btn-ghost btn-sm" onClick={() => handleRetry(job.id)} disabled={retrying[job.id]} id={`retry-sync-${job.id}`}>
                         <RotateCcw size={13} /> {retrying[job.id] ? 'Retrying...' : 'Retry'}
@@ -292,10 +293,10 @@ export default function SyncDashboardPage() {
             <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Wifi size={18} color="#10b981" /> Delivery Centre Integration
             </span>
-            <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', borderRadius: 999, padding: '3px 10px', fontSize: '0.72rem', fontWeight: 700 }}>CONNECTED</span>
+            <span style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', borderRadius: 999, padding: '3px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{syncStatus.remote_reachable === false ? 'UNREACHABLE' : syncStatus.remote_reachable ? 'CONNECTED' : 'SHARED DATABASE'}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: '1rem' }}>
-            {Object.entries(syncStatus).map(([k, v]) => (
+            {Object.entries(syncStatus).filter(([key]) => key !== 'recent_logs').map(([k, v]) => (
               <div key={k} style={{ fontSize: '0.8rem' }}>
                 <div style={{ color: 'var(--text-muted)', marginBottom: 2, textTransform: 'capitalize' }}>{k.replace(/_/g, ' ')}</div>
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{typeof v === 'object' ? JSON.stringify(v) : String(v)}</div>

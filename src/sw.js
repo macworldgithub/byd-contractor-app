@@ -81,7 +81,7 @@ self.addEventListener('push', (event) => {
     body: data.body || 'You have a new update.',
     icon: '/pwa-192x192.png',
     badge: '/favicon.svg',
-    data: data.url || '/', // URL to open on click
+    data: data.data?.url || data.url || (data.data?.job_id ? `/jobs/${encodeURIComponent(data.data.job_id)}` : '/'), // URL to open on click
     vibrate: [200, 100, 200]
   };
 
@@ -93,7 +93,8 @@ self.addEventListener('push', (event) => {
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const urlToOpen = event.notification.data || '/';
+  const target = new URL(event.notification.data || '/', self.location.origin);
+  const urlToOpen = target.origin === self.location.origin ? target.href : self.location.origin;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {

@@ -28,7 +28,7 @@ export default function DashboardPage() {
           jobsApi.list({ issue_flag: true, limit: 8 }),
         ]);
         setDashboard(dash);
-        setActiveLog(active?.active_log || null);
+        setActiveLog(active?.entry || null);
         setRecentJobs(Array.isArray(jobs) ? jobs : []);
         // Merge urgent + flagged, deduplicate by id
         const allEscalated = [...(Array.isArray(urgent) ? urgent : []), ...(Array.isArray(blocked) ? blocked : [])];
@@ -41,6 +41,10 @@ export default function DashboardPage() {
       }
     };
     load();
+    const refresh = () => { if (navigator.onLine && document.visibilityState !== 'hidden') load(); };
+    const interval = setInterval(refresh, 10000);
+    window.addEventListener('focus', refresh);
+    return () => { clearInterval(interval); window.removeEventListener('focus', refresh); };
   }, []);
 
   // Live timer for active clock-in
@@ -133,13 +137,13 @@ export default function DashboardPage() {
         <StatCard
           icon={<AlertTriangle size={20} />}
           label="Urgent / Flagged"
-          value={(stats.urgent_jobs ?? 0) + (stats.flagged_jobs ?? 0)}
+          value={stats.escalated_jobs ?? 0}
           color="var(--byd-red)"
           highlight
         />
         {isAdmin && (
           <>
-            <StatCard icon={<Users size={20} />} label="Active Contractors" value={stats.active_contractors ?? '—'} color="#3b82f6" />
+            <StatCard icon={<Users size={20} />} label="Workers on Jobs" value={stats.active_contractors ?? '—'} color="#3b82f6" />
             <StatCard icon={<TrendingUp size={20} />} label="Avg Time/Job" value={stats.avg_time_per_job_seconds ? formatDuration(stats.avg_time_per_job_seconds) : '—'} color="#f59e0b" small />
           </>
         )}
@@ -187,12 +191,17 @@ export default function DashboardPage() {
             <div className="card-header">
               <span className="card-title">Pipeline Status</span>
             </div>
-            {Object.entries(stats.jobs_by_status || {}).map(([status, count]) => (
+            {Object.entries(stats.pipeline || {}).map(([status, count]) => (
               <PipelineRow key={status} status={status} count={count} total={stats.total_jobs || 1} />
             ))}
           </div>
         )}
       </div>
+
+      {isAdmin && <div className="card" style={{ marginTop: '1.5rem' }}><h2 className="card-title">Pipeline</h2>{Object.entries(stats.pipeline || {}).map(([status, count]) => <PipelineRow key={status} status={status} count={count} total={stats.total_jobs || 1} />)}</div>}
+      {isAdmin && <div className="card" style={{ marginTop: '1.5rem' }}><h2 className="card-title">Team workload</h2>{Object.entries(stats.team_workload || {}).map(([name, count]) => <p key={name}>{name}: <strong>{count}</strong> active jobs</p>)}</div>}
+      <div className="card" style={{ marginTop: '1.5rem' }}><h2 className="card-title">My active jobs</h2>{(stats.personal_jobs || []).map(job => <MiniJobRow key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />)}{!stats.personal_jobs?.length && <p>No active jobs assigned to you.</p>}</div>
+      {isAdmin && <div className="card" style={{ marginTop: '1.5rem' }}><h2 className="card-title">Longest waiting jobs</h2>{(stats.bottlenecks || []).map(job => <MiniJobRow key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />)}</div>}
 
       {/* Escalation Queue (Admin only) */}
       {isAdmin && urgentJobs.length > 0 && (

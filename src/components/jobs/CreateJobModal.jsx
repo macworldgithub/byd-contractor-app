@@ -1,3 +1,4 @@
+import { useAuth } from '../../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { X, Zap } from 'lucide-react';
 import { jobsApi, templatesApi } from '../../api/client';
@@ -6,6 +7,7 @@ const STATUS_OPTIONS = ['requested', 'collected', 'in_progress', 'returned', 'co
 const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent'];
 
 export default function CreateJobModal({ contractors, initialTemplate = null, onClose, onCreated }) {
+  const { user } = useAuth();
   const [templates, setTemplates] = useState([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTemplate?.id || '');
   const [form, setForm] = useState({
@@ -16,7 +18,7 @@ export default function CreateJobModal({ contractors, initialTemplate = null, on
     priority: 'normal',
     status: 'requested',
     assigned_contractor_id: '',
-    site_location: 'Fairfield',
+    site_location: user?.locked_site || user?.active_site || 'Fairfield',
     bay_location: '',
     due_date: '',
     delivery_date_time: '',

@@ -1,3 +1,4 @@
+import useLiveRefresh from '../hooks/useLiveRefresh';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Filter, Search, Download, RefreshCw, Upload } from 'lucide-react';
@@ -27,14 +28,14 @@ export default function JobsPage() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [contractors, setContractors] = useState([]);
 
-  const loadJobs = useCallback(async () => {
-    setLoading(true);
+  const loadJobs = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
       if (priorityFilter) params.priority = priorityFilter;
       if (urgentOnly) params.is_urgent = true;
-      const data = await jobsApi.list(params);
+      const data = await jobsApi.listAll(params);
       let result = Array.isArray(data) ? data : [];
       if (search) {
         const q = search.toLowerCase();
@@ -58,6 +59,8 @@ export default function JobsPage() {
   useEffect(() => {
     if (isAdmin) contractorsApi.list().then(setContractors).catch(() => {});
   }, [isAdmin]);
+
+  useLiveRefresh(loadJobs);
 
   return (
     <AppLayout>

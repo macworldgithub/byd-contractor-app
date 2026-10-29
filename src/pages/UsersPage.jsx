@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import AppLayout from '../components/layout/AppLayout';
+import { useAuth } from '../contexts/AuthContext';
 import { adminApi } from '../api/client';
 import { Plus, Edit3, Key, Trash2, X, AlertCircle } from 'lucide-react';
 import { formatDate, timeAgo, getInitials } from '../utils/helpers';
 
-const ROLES = ['contractor', 'admin', 'super_admin'];
+const ALL_ROLES = ['contractor', 'admin', 'super_admin'];
 
 export default function UsersPage() {
+  const { user: actor } = useAuth();
+  const ROLES = actor?.role === 'super_admin' ? ALL_ROLES : ['contractor'];
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);

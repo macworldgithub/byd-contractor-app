@@ -1,6 +1,7 @@
+import { getQueue, flushOfflineQueue } from '../utils/offlineQueue';
 import { useState, useEffect } from 'react';
 import AppLayout from '../components/layout/AppLayout';
-import { authApi, integrationApi, pushApi } from '../api/client';
+import { authApi, integrationApi, pushApi, offlineApi, evidenceApi } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { usePWA } from '../contexts/PWAContext';
 import { Settings, RefreshCw, Key, Check, AlertCircle, Bell, BellOff, Smartphone, Download, Share, Wifi, CheckCircle2, Globe, Shield, Play } from 'lucide-react';
@@ -8,7 +9,7 @@ import { formatDateTime, timeAgo } from '../utils/helpers';
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isAdmin = ['admin', 'super_admin', 'site_admin'].includes(user?.role);
   const isSuper = user?.role === 'super_admin';
   const { canInstall, isInstalled, isIOS, isOnline, installApp } = usePWA();
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm: '' });
@@ -22,22 +23,38 @@ export default function SettingsPage() {
 
   // Integration Config State (Super Admin / Admin)
   const [intConfig, setIntConfig] = useState({
-    api_url: 'https://deliverycentre.goodshowroom.com',
+    api_url: '',
     api_key: '',
+    webhook_secret: '',
+    outbound_webhook_url: '',
     webhook_url: 'https://byd-panel.omnisuiteai.com/api/contractor/integrations/webhook',
     polling_interval_minutes: 10,
     auto_poll_enabled: true
   });
   const [configSaving, setConfigSaving] = useState(false);
   const [configMsg, setConfigMsg] = useState('');
+  const [pendingWork, setPendingWork] = useState([]);
+  const [retryingWork, setRetryingWork] = useState(false);
+  useEffect(() => {
+    const refresh = () => getQueue().then(setPendingWork).catch(() => {});
+    refresh();
+    window.addEventListener('byd-queue-change', refresh);
+    return () => window.removeEventListener('byd-queue-change', refresh);
+  }, []);
+  const retryWork = async () => {
+    setRetryingWork(true);
+    try { await flushOfflineQueue(offlineApi, evidenceApi); }
+    catch (error) { alert(error.message); }
+    finally { setRetryingWork(false); }
+  };
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isSuper) {
       integrationApi.getConfig().then(data => {
         if (data) setIntConfig(data);
       }).catch(() => {});
     }
-  }, [isAdmin]);
+  }, [isSuper]);
 
   const [pushStatus, setPushStatus] = useState(
     ('Notification' in window && Notification.permission === 'granted') ? 'enabled' : 'disabled'
@@ -121,6 +138,7 @@ export default function SettingsPage() {
     setPollResult(null);
     try {
       const res = await integrationApi.poll();
+      if (res.status === 'error') throw new Error(res.error || 'Polling failed');
       setPollResult(res);
       await handleSyncStatus();
     } catch (e) { alert(`Polling sync error: ${e.message}`); }
@@ -132,7 +150,8 @@ export default function SettingsPage() {
     setConfigSaving(true);
     setConfigMsg('');
     try {
-      await integrationApi.saveConfig(intConfig);
+      const response = await integrationApi.saveConfig(intConfig);
+      setIntConfig(response.config);
       setConfigMsg('Integration settings saved successfully!');
     } catch (e) { alert(`Failed to save settings: ${e.message}`); }
     setConfigSaving(false);
@@ -145,6 +164,12 @@ export default function SettingsPage() {
       </div>
 
       <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem', width: '100%' }}>
+        <div className="card">
+          <div className="card-header"><h2 className="card-title">Pending work ({pendingWork.length})</h2><button className="btn btn-ghost btn-sm" disabled={!isOnline || retryingWork || !pendingWork.length} onClick={retryWork}>{retryingWork ? 'Syncing...' : 'Retry sync'}</button></div>
+          {!pendingWork.length && <p>All saved work has been synced.</p>}
+          {pendingWork.map(action => <div key={action.client_action_id} style={{ marginTop: 12 }}><strong>{action.action_type.replaceAll('_', ' ')}</strong><p>Job {action.job_id} - {formatDateTime(action.queued_at)}</p>{action.last_error && <p role="alert" style={{ color: 'var(--byd-red)' }}>{action.last_error}</p>}</div>)}
+        </div>
+
         {/* Account Info */}
         <div className="card">
           <div className="card-header">
@@ -273,7 +298,7 @@ export default function SettingsPage() {
                     {isOnline ? 'Online & Synced' : 'Offline Mode Active'}
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Workbox caching &amp; indexed queue active
+                    Saved job data and pending work stay on this device
                   </div>
                 </div>
               </div>
@@ -313,7 +338,7 @@ export default function SettingsPage() {
 
             {isInstalled && (
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textAlign: 'center', padding: '4px 0' }}>
-                ✓ PWA is active with full offline support and instant launch.
+                PWA installed. Open jobs online once to make them available offline.
               </div>
             )}
           </div>
@@ -343,7 +368,7 @@ export default function SettingsPage() {
                   disabled={pollLoading}
                 >
                   <Play size={14} className={pollLoading ? 'spin' : ''} />
-                  {pollLoading ? 'Polling...' : 'Trigger 10-Min Polling Sync Now'}
+                  {pollLoading ? 'Polling...' : 'Run Polling Sync Now'}
                 </button>
               )}
             </div>
@@ -373,7 +398,7 @@ export default function SettingsPage() {
                     type="url"
                     value={intConfig.api_url}
                     onChange={e => setIntConfig(c => ({ ...c, api_url: e.target.value }))}
-                    placeholder="https://deliverycentre.goodshowroom.com"
+                    placeholder="Leave blank to use the shared Delivery Centre database"
                   />
                 </div>
                 <div className="form-group">
@@ -383,8 +408,21 @@ export default function SettingsPage() {
                     type="password"
                     value={intConfig.api_key}
                     onChange={e => setIntConfig(c => ({ ...c, api_key: e.target.value }))}
-                    placeholder="••••••••••••••••"
+                    placeholder={intConfig.api_key_configured ? 'Configured - leave blank to retain' : 'API key for remote polling'}
                   />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="outbound-webhook">Outbound Delivery Centre Webhook</label>
+                  <input id="outbound-webhook" className="form-input" type="url" value={intConfig.outbound_webhook_url || ''} onChange={e => setIntConfig(c => ({ ...c, outbound_webhook_url: e.target.value }))} placeholder="https://.../api/contractor/integrations/webhook" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="webhook-secret">Webhook Authentication Secret</label>
+                  <input id="webhook-secret" className="form-input" type="password" autoComplete="new-password" value={intConfig.webhook_secret || ''} onChange={e => setIntConfig(c => ({ ...c, webhook_secret: e.target.value }))} placeholder={intConfig.webhook_secret_configured ? 'Configured - leave blank to retain' : 'Shared secret for signed webhooks'} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="polling-interval">Polling Interval (minutes)</label>
+                  <input id="polling-interval" className="form-input" type="number" min="5" max="15" value={intConfig.polling_interval_minutes} onChange={e => setIntConfig(c => ({ ...c, polling_interval_minutes: Number(e.target.value) }))} />
+                  <label><input type="checkbox" checked={intConfig.auto_poll_enabled} onChange={e => setIntConfig(c => ({ ...c, auto_poll_enabled: e.target.checked }))} /> Enable automatic polling</label>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Incoming Webhook Endpoint</label>

@@ -9,7 +9,7 @@ import { useAuth, useIsAdmin } from '../../contexts/AuthContext';
 import { usePWA } from '../../contexts/PWAContext';
 import { getInitials } from '../../utils/helpers';
 import { getQueueSize, flushOfflineQueue } from '../../utils/offlineQueue';
-import { offlineApi } from '../../api/client';
+import { offlineApi, evidenceApi } from '../../api/client';
 
 export default function BottomNav() {
   const { user, logout } = useAuth();
@@ -252,7 +252,7 @@ export default function BottomNav() {
                 <div
                   className="mobile-more-offline-banner"
                   onClick={async () => {
-                    const res = await flushOfflineQueue(offlineApi);
+                    const res = await flushOfflineQueue(offlineApi, evidenceApi);
                     setQueueSize(getQueueSize());
                     if (res && res.succeeded > 0) alert(`Synced ${res.succeeded} actions!`);
                   }}

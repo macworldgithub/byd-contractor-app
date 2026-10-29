@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import AppLayout from '../components/layout/AppLayout';
-import { analyticsApi } from '../api/client';
+import { analyticsApi, contractorsApi } from '../api/client';
 import { formatDuration, capitalize, STATUS_LABELS } from '../utils/helpers';
 import { BarChart2, TrendingUp, Clock, CheckCircle, Download } from 'lucide-react';
 
@@ -10,26 +10,34 @@ export default function AnalyticsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [exportLoading, setExportLoading] = useState('');
+  const [contractors, setContractors] = useState([]);
+  const [contractorId, setContractorId] = useState('');
+  const [model, setModel] = useState('');
+  const [status, setStatus] = useState('');
+  const [period, setPeriod] = useState('week');
+  const [error, setError] = useState('');
+  const reportParams = () => Object.fromEntries(Object.entries({ date_from: dateFrom, date_to: dateTo, contractor_id: contractorId, model, status }).filter(([, value]) => value));
+  useEffect(() => { contractorsApi.list().then(setContractors).catch(() => {}); }, []);
 
   const load = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
+      setError('');
+      const params = reportParams();
       const res = await analyticsApi.analytics(params);
       setData(res);
-    } catch (e) { console.error(e); }
+    } catch (e) { setError(e.message); }
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [dateFrom, dateTo]);
+  useEffect(() => { load(); }, [dateFrom, dateTo, contractorId, model, status]);
 
   const handleExport = async (format) => {
     setExportLoading(format);
     try {
       const token = localStorage.getItem('byd_token');
-      const url = `${import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?token=${token || ''}`;
+      const query = new URLSearchParams(reportParams());
+      const url = `${import.meta.env.VITE_API_URL || 'https://byd-panel.omnisuiteai.com'}/api/contractor/export${format !== 'csv' ? `/${format}` : ''}?${query}`;
 
       const res = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -73,6 +81,13 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      <div className="filters-bar">
+        <label>Contractor <select aria-label="Filter by contractor" className="form-select" value={contractorId} onChange={e => setContractorId(e.target.value)}><option value="">All contractors</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        <label>Model <input aria-label="Filter by model" className="form-input" value={model} onChange={e => setModel(e.target.value)} placeholder="All models" /></label>
+        <label>Status <select aria-label="Filter by status" className="form-select" value={status} onChange={e => setStatus(e.target.value)}><option value="">All statuses</option>{Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+      </div>
+
       {/* Date filters */}
       <div className="analytics-date-filters">
         <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem', flex: '1 1 180px' }}>
@@ -83,7 +98,7 @@ export default function AnalyticsPage() {
           <label className="form-label" style={{ whiteSpace: 'nowrap' }}>To</label>
           <input type="date" className="form-input" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
-        <button className="btn btn-ghost btn-sm" style={{ height: 38 }} onClick={() => { setDateFrom(''); setDateTo(''); }}>Clear</button>
+        <button className="btn btn-ghost btn-sm" style={{ height: 38 }} onClick={() => { setDateFrom(''); setDateTo(''); setContractorId(''); setModel(''); setStatus(''); }}>Clear</button>
       </div>
 
       {loading ? (
@@ -101,9 +116,9 @@ export default function AnalyticsPage() {
           <div className="stats-grid">
             <StatCard icon={<BarChart2 size={20} />} label="Total Jobs" value={data.total_jobs ?? '—'} />
             <StatCard icon={<CheckCircle size={20} />} label="Completed" value={data.completed_jobs ?? '—'} color="#10b981" />
-            <StatCard icon={<TrendingUp size={20} />} label="Completion Rate" value={data.completion_rate ? `${data.completion_rate}%` : '—'} />
-            <StatCard icon={<Clock size={20} />} label="Avg Time/Job" value={data.avg_time_per_job_seconds ? formatDuration(data.avg_time_per_job_seconds) : '—'} small />
-            <StatCard icon={<BarChart2 size={20} />} label="Total Hours Logged" value={data.total_time_seconds ? formatDuration(data.total_time_seconds) : '—'} small />
+            <StatCard icon={<TrendingUp size={20} />} label="Completion Rate" value={data.completion_rate != null ? `${data.completion_rate}%` : '—'} />
+            <StatCard icon={<Clock size={20} />} label="Avg Time/Job" value={data.avg_time_per_job_seconds != null ? formatDuration(data.avg_time_per_job_seconds) : '—'} small />
+            <StatCard icon={<BarChart2 size={20} />} label="Total Hours Logged" value={data.total_time_seconds != null ? formatDuration(data.total_time_seconds) : '—'} small />
             <StatCard icon={<BarChart2 size={20} />} label="Overdue Jobs" value={data.overdue_jobs ?? '—'} color="#f59e0b" />
           </div>
 
@@ -174,6 +189,21 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="card">
+            <h2 className="card-title">Completion trends</h2>
+            {!data.completion_trends?.length && <p>No completions in this period.</p>}
+            {(data.completion_trends || []).map(point => <div key={point.date} style={{ marginTop: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{point.date}</span><strong>{point.completed}</strong></div>
+              <div className="progress-bar"><div className="progress-fill" style={{ width: `${100 * point.completed / Math.max(1, ...data.completion_trends.map(p => p.completed))}%` }} /></div>
+            </div>)}
+          </div>
+          <div className="card">
+            <div className="card-header"><h2 className="card-title">Jobs by period</h2><select className="form-select" aria-label="Report period" value={period} onChange={e => setPeriod(e.target.value)}><option value="week">Weekly</option><option value="month">Monthly</option></select></div>
+            <div className="table-container"><table><thead><tr><th>Period</th><th>Contractor</th><th>Model</th><th>Status</th><th>Jobs</th></tr></thead><tbody>
+              {(period === 'week' ? data.jobs_per_week : data.jobs_per_month)?.map((row, index) => <tr key={index}><td>{row.period}</td><td>{row.contractor}</td><td>{row.model}</td><td>{STATUS_LABELS[row.status] || row.status}</td><td>{row.jobs}</td></tr>)}
+            </tbody></table></div>
           </div>
 
           {/* Average Time per Task / Checklist Item (Scope §5) */}

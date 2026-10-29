@@ -15,22 +15,11 @@ export default function TimeLogsPage() {
       setLoading(true);
       try {
         const active = await timeApi.getActive();
-        setActiveLog(active?.active_log || null);
+        setActiveLog(active?.entry || null);
 
-        // Get recent jobs to look up time logs
-        const jobData = await jobsApi.list({ limit: 100 });
-        const jobMap = {};
-        (Array.isArray(jobData) ? jobData : []).forEach(j => { jobMap[j.id] = j; });
+        const [jobData, allLogs] = await Promise.all([jobsApi.listAll(), timeApi.list()]);
+        const jobMap = Object.fromEntries((jobData || []).map(job => [job.id, job]));
         setJobs(jobMap);
-
-        // Get logs for each job
-        const allLogs = [];
-        for (const job of Object.values(jobMap).slice(0, 30)) {
-          try {
-            const tl = await timeApi.getLogs(job.id);
-            if (Array.isArray(tl)) allLogs.push(...tl);
-          } catch {}
-        }
         allLogs.sort((a, b) => new Date(b.clock_in) - new Date(a.clock_in));
         setLogs(allLogs);
       } catch (e) { console.error(e); }

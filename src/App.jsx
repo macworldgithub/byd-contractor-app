@@ -36,7 +36,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role === 'contractor') return <Navigate to="/" replace />;
+  if (adminOnly && !['admin', 'super_admin', 'site_admin'].includes(user.role)) return <Navigate to="/" replace />;
 
   return children;
 }
