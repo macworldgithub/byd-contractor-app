@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PWAProvider } from './contexts/PWAContext';
-import { offlineApi } from './api/client';
+import { offlineApi, evidenceApi } from './api/client';
 import { initOfflineSync } from './utils/offlineQueue';
 
 // Pages
@@ -46,7 +46,7 @@ function AppRoutes() {
 
   useEffect(() => {
     if (user) {
-      const cleanup = initOfflineSync(offlineApi, (result) => {
+      const cleanup = initOfflineSync(offlineApi, evidenceApi, (result) => {
         console.log(`[OfflineSync] Flushed ${result.succeeded} actions.`);
       });
       return cleanup;

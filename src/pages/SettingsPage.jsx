@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/layout/AppLayout';
 import { authApi, integrationApi, pushApi } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { usePWA } from '../contexts/PWAContext';
-import { Settings, RefreshCw, Key, Check, AlertCircle, Bell, BellOff, Smartphone, Download, Share, Wifi, CheckCircle2 } from 'lucide-react';
+import { Settings, RefreshCw, Key, Check, AlertCircle, Bell, BellOff, Smartphone, Download, Share, Wifi, CheckCircle2, Globe, Shield, Play } from 'lucide-react';
 import { formatDateTime, timeAgo } from '../utils/helpers';
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const isSuper = user?.role === 'super_admin';
   const { canInstall, isInstalled, isIOS, isOnline, installApp } = usePWA();
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm: '' });
   const [pwLoading, setPwLoading] = useState(false);
@@ -15,6 +17,27 @@ export default function SettingsPage() {
   const [pwError, setPwError] = useState('');
   const [syncStatus, setSyncStatus] = useState(null);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [pollLoading, setPollLoading] = useState(false);
+  const [pollResult, setPollResult] = useState(null);
+
+  // Integration Config State (Super Admin / Admin)
+  const [intConfig, setIntConfig] = useState({
+    api_url: 'https://deliverycentre.goodshowroom.com',
+    api_key: '',
+    webhook_url: 'https://byd-panel.omnisuiteai.com/api/contractor/integrations/webhook',
+    polling_interval_minutes: 10,
+    auto_poll_enabled: true
+  });
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configMsg, setConfigMsg] = useState('');
+
+  useEffect(() => {
+    if (isAdmin) {
+      integrationApi.getConfig().then(data => {
+        if (data) setIntConfig(data);
+      }).catch(() => {});
+    }
+  }, [isAdmin]);
 
   const [pushStatus, setPushStatus] = useState(
     ('Notification' in window && Notification.permission === 'granted') ? 'enabled' : 'disabled'
@@ -91,6 +114,28 @@ export default function SettingsPage() {
       setSyncStatus(res);
     } catch (e) { alert(e.message); }
     setSyncLoading(false);
+  };
+
+  const handleManualPoll = async () => {
+    setPollLoading(true);
+    setPollResult(null);
+    try {
+      const res = await integrationApi.poll();
+      setPollResult(res);
+      await handleSyncStatus();
+    } catch (e) { alert(`Polling sync error: ${e.message}`); }
+    setPollLoading(false);
+  };
+
+  const handleSaveConfig = async (e) => {
+    e.preventDefault();
+    setConfigSaving(true);
+    setConfigMsg('');
+    try {
+      await integrationApi.saveConfig(intConfig);
+      setConfigMsg('Integration settings saved successfully!');
+    } catch (e) { alert(`Failed to save settings: ${e.message}`); }
+    setConfigSaving(false);
   };
 
   return (
@@ -274,30 +319,100 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Integration Status */}
+        {/* Integration Status & Controls */}
         <div className="card" style={{ gridColumn: '1 / -1' }}>
           <div className="card-header">
-            <span className="card-title">Delivery Centre Integration</span>
-            <RefreshCw size={18} style={{ color: 'var(--text-muted)' }} />
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Globe size={18} color="var(--byd-red)" /> Delivery Centre Integration &amp; Polling
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                id="sync-status-btn"
+                className="btn btn-ghost btn-sm"
+                onClick={handleSyncStatus}
+                disabled={syncLoading}
+              >
+                <RefreshCw size={14} className={syncLoading ? 'spin' : ''} />
+                {syncLoading ? 'Checking...' : 'Check Status'}
+              </button>
+              {isAdmin && (
+                <button
+                  id="sync-poll-btn"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleManualPoll}
+                  disabled={pollLoading}
+                >
+                  <Play size={14} className={pollLoading ? 'spin' : ''} />
+                  {pollLoading ? 'Polling...' : 'Trigger 10-Min Polling Sync Now'}
+                </button>
+              )}
+            </div>
           </div>
-          <button
-            id="sync-status-btn"
-            className="btn btn-ghost"
-            onClick={handleSyncStatus}
-            disabled={syncLoading}
-            style={{ marginBottom: '1rem' }}
-          >
-            <RefreshCw size={15} className={syncLoading ? 'spin' : ''} />
-            {syncLoading ? 'Checking...' : 'Check Sync Status'}
-          </button>
+
+          {pollResult && (
+            <div className="alert alert-success" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
+              <Check size={16} />
+              <span>
+                Polling completed: <strong>{pollResult.created_jobs ?? 0}</strong> jobs auto-created, <strong>{pollResult.updated_jobs ?? 0}</strong> updated, <strong>{pollResult.synced_back_jobs ?? 0}</strong> synced back to Delivery Centre.
+              </span>
+            </div>
+          )}
+
+          {/* Super Admin API Configuration */}
+          {isSuper && (
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-border)' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Shield size={16} color="var(--byd-red)" /> Two-Way API &amp; Webhook Credentials (Super Admin)
+              </div>
+              {configMsg && <div className="alert alert-success" style={{ marginBottom: '0.75rem' }}><Check size={16} />{configMsg}</div>}
+              <form onSubmit={handleSaveConfig} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
+                <div className="form-group">
+                  <label className="form-label">Delivery Centre API URL</label>
+                  <input
+                    className="form-input"
+                    type="url"
+                    value={intConfig.api_url}
+                    onChange={e => setIntConfig(c => ({ ...c, api_url: e.target.value }))}
+                    placeholder="https://deliverycentre.goodshowroom.com"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Delivery Centre API Key / Bearer Token</label>
+                  <input
+                    className="form-input"
+                    type="password"
+                    value={intConfig.api_key}
+                    onChange={e => setIntConfig(c => ({ ...c, api_key: e.target.value }))}
+                    placeholder="••••••••••••••••"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Incoming Webhook Endpoint</label>
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={intConfig.webhook_url}
+                    onChange={e => setIntConfig(c => ({ ...c, webhook_url: e.target.value }))}
+                    readOnly
+                  />
+                </div>
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.75rem', paddingBottom: 6 }}>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={configSaving}>
+                    {configSaving ? 'Saving...' : 'Save API Credentials'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
           {syncStatus && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }} className="fade-in">
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 {[
-                  ['Total Syncs', syncStatus.total_syncs],
-                  ['Successful', syncStatus.successful],
-                  ['Failed', syncStatus.failed],
+                  ['Total Syncs', syncStatus.total_sync_events ?? syncStatus.total_syncs],
+                  ['Successful', syncStatus.success_count ?? syncStatus.successful],
+                  ['Failed', syncStatus.failed_count ?? syncStatus.failed],
+                  ['System Health', syncStatus.health ?? 'Healthy'],
                   ['Last Sync', formatDateTime(syncStatus.last_sync_at)],
                 ].map(([label, val]) => (
                   <div key={label}>

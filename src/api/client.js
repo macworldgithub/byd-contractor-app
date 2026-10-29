@@ -177,6 +177,12 @@ export const integrationApi = {
     api.post(`/api/contractor/integrations/sync-to-client/${jobId}`),
   syncStatus: () =>
     api.get('/api/contractor/integrations/sync-status'),
+  poll: () =>
+    api.post('/api/contractor/integrations/poll'),
+  getConfig: () =>
+    api.get('/api/contractor/integrations/config'),
+  saveConfig: (data) =>
+    api.post('/api/contractor/integrations/config', data),
 };
 
 // ============================================================

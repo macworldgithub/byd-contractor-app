@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   RefreshCw, CheckCircle, AlertTriangle, Clock, Zap, Activity,
-  RotateCcw, ExternalLink, Database, Wifi, WifiOff, ChevronDown, ChevronUp
+  RotateCcw, ExternalLink, Database, Wifi, WifiOff, ChevronDown, ChevronUp, Play, Check
 } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { integrationApi, jobsApi, DELIVERY_CENTRE_URL } from '../api/client';
@@ -48,6 +48,20 @@ export default function SyncDashboardPage() {
       alert('Sync retried successfully!');
     } catch (e) { alert(`Retry failed: ${e.message}`); }
     setRetrying(r => ({ ...r, [jobId]: false }));
+  };
+
+  const [polling, setPolling] = useState(false);
+  const [pollBanner, setPollBanner] = useState(null);
+
+  const handleTriggerPoll = async () => {
+    setPolling(true);
+    setPollBanner(null);
+    try {
+      const res = await integrationApi.poll();
+      setPollBanner(res);
+      await load();
+    } catch (e) { alert(`Polling sync failed: ${e.message}`); }
+    setPolling(false);
   };
 
   const toggleExpanded = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
@@ -98,8 +112,21 @@ export default function SyncDashboardPage() {
           <button className="btn btn-ghost" onClick={load} id="sync-manual-refresh">
             <RefreshCw size={16} /> Refresh
           </button>
+          <button className="btn btn-primary" onClick={handleTriggerPoll} disabled={polling} id="sync-trigger-poll">
+            <Play size={16} className={polling ? 'spin' : ''} />
+            {polling ? 'Polling DC...' : 'Trigger 10-Min Polling Sync'}
+          </button>
         </div>
       </div>
+
+      {pollBanner && (
+        <div className="alert alert-success" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Check size={18} />
+          <span>
+            Scheduled Polling Sync Completed: <strong>{pollBanner.created_jobs ?? 0}</strong> jobs auto-created, <strong>{pollBanner.updated_jobs ?? 0}</strong> updated, <strong>{pollBanner.synced_back_jobs ?? 0}</strong> synced back.
+          </span>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>

@@ -176,6 +176,38 @@ export default function AnalyticsPage() {
             )}
           </div>
 
+          {/* Average Time per Task / Checklist Item (Scope §5) */}
+          {data.average_time_per_task && data.average_time_per_task.length > 0 && (
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Clock size={18} color="var(--byd-red)" /> Average Time per Task Type
+                </span>
+                <span className="badge badge-normal">{data.average_time_per_task.length} Task Types</span>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Task / Service Type</th>
+                      <th>Avg Duration</th>
+                      <th>Tasks Completed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.average_time_per_task.map((item) => (
+                      <tr key={item.task_title}>
+                        <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.task_title}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--byd-red)' }}>{item.avg_minutes} mins</td>
+                        <td style={{ color: 'var(--text-muted)' }}>{item.total_completed} jobs</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Jobs Completed per VIN (Scope §5) */}
           {data.completed_per_vin && data.completed_per_vin.length > 0 && (
             <div className="card">

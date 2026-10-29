@@ -200,33 +200,91 @@ export default function JobDetailPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setActionLoading('evidence');
+
+    const queueOfflineUpload = (fileObj) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        addToQueue({
+          action_type: 'upload_evidence',
+          job_id: id,
+          payload: {
+            stage: evidenceStage,
+            caption: '',
+            fileName: fileObj.name,
+            fileType: fileObj.type,
+            fileData: reader.result,
+          }
+        });
+        alert('Offline: Photo/video queued. It will upload automatically once you reconnect.');
+      };
+      reader.readAsDataURL(fileObj);
+    };
+
+    if (!navigator.onLine) {
+      queueOfflineUpload(file);
+      e.target.value = '';
+      setActionLoading('');
+      return;
+    }
+
     try {
       await evidenceApi.upload(id, file, evidenceStage, '');
       await reload();
       e.target.value = '';
-    } catch (err) { alert(err.message); }
+    } catch (err) {
+      if (isOfflineError(err)) {
+        queueOfflineUpload(file);
+        e.target.value = '';
+      } else {
+        alert(err.message);
+      }
+    }
     setActionLoading('');
   };
 
-  // ----- Per-task timer helpers -----
-  const getTaskElapsed = (taskId) => {
+  // ----- Per-task timer helpers with backend persistence -----
+  const getTaskElapsed = (taskId, baseSec = 0) => {
     const t = taskTimers[taskId];
-    if (!t) return 0;
-    if (t.running) return t.accumulated + Math.floor((Date.now() - t.startTs) / 1000);
-    return t.accumulated;
+    const base = t ? t.accumulated : (baseSec || 0);
+    if (t?.running) return base + Math.floor((Date.now() - t.startTs) / 1000);
+    return base;
   };
 
-  const toggleTaskTimer = (taskId) => {
-    setTaskTimers(prev => {
-      const t = prev[taskId] || { running: false, startTs: null, accumulated: 0 };
-      if (t.running) {
-        // stop
-        return { ...prev, [taskId]: { running: false, startTs: null, accumulated: t.accumulated + Math.floor((Date.now() - t.startTs) / 1000) } };
-      } else {
-        // start
-        return { ...prev, [taskId]: { running: true, startTs: Date.now(), accumulated: t.accumulated } };
+  const toggleTaskTimer = async (taskId) => {
+    const isRunning = taskTimers[taskId]?.running;
+    if (isRunning) {
+      // Stop and clock out
+      setTaskTimers(prev => ({
+        ...prev,
+        [taskId]: {
+          running: false,
+          startTs: null,
+          accumulated: (prev[taskId]?.accumulated || 0) + Math.floor((Date.now() - prev[taskId].startTs) / 1000)
+        }
+      }));
+      try {
+        await timeApi.clockOut(id);
+        await reload();
+      } catch (err) {
+        console.warn('Task clock out sync error:', err);
       }
-    });
+    } else {
+      // Start and clock in with task_id
+      setTaskTimers(prev => ({
+        ...prev,
+        [taskId]: {
+          running: true,
+          startTs: Date.now(),
+          accumulated: prev[taskId]?.accumulated || 0
+        }
+      }));
+      try {
+        await timeApi.clockIn(id, taskId, 'Started task');
+        await reload();
+      } catch (err) {
+        console.warn('Task clock in sync error:', err);
+      }
+    }
   };
 
   const resetTaskTimer = (taskId) => {
@@ -567,7 +625,7 @@ export default function JobDetailPage() {
               key={task.id}
               task={task}
               onToggle={() => handleTaskToggle(task)}
-              elapsed={getTaskElapsed(task.id)}
+              elapsed={getTaskElapsed(task.id, task.duration_seconds)}
               timerRunning={taskTimers[task.id]?.running || false}
               onTimerToggle={() => toggleTaskTimer(task.id)}
               onTimerReset={() => resetTaskTimer(task.id)}
