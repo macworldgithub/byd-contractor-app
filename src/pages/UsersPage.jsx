@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { adminApi } from '../api/client';
 import { Plus, Edit3, Key, Trash2, X, AlertCircle } from 'lucide-react';
 import { formatDate, timeAgo, getInitials } from '../utils/helpers';
+import Pagination, { usePagination } from '../components/common/Pagination';
 
 const ALL_ROLES = ['contractor', 'admin', 'super_admin'];
 
@@ -16,6 +17,7 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState(null);
   const [tempPassword, setTempPassword] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const pagination = usePagination(users, 10);
 
   const load = async () => {
     setLoading(true);
@@ -104,7 +106,7 @@ export default function UsersPage() {
             <tbody>
               {users.length === 0 ? (
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No users found</td></tr>
-              ) : users.map(u => (
+              ) : pagination.paginatedItems.map(u => (
                 <tr key={u.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -149,6 +151,14 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalItems={pagination.totalItems}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.onPageChange}
+            onPageSizeChange={pagination.onPageSizeChange}
+            pageSizeOptions={[5, 10, 20, 50]}
+          />
         </div>
       )}
 

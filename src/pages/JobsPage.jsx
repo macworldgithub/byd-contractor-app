@@ -8,6 +8,7 @@ import { useAuth, useIsAdmin } from '../contexts/AuthContext';
 import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, formatDate, taskProgress, timeAgo } from '../utils/helpers';
 import CreateJobModal from '../components/jobs/CreateJobModal';
 import BulkImportModal from '../components/jobs/BulkImportModal';
+import Pagination, { usePagination } from '../components/common/Pagination';
 
 const STATUS_OPTIONS = ['requested', 'collected', 'in_progress', 'returned', 'completed', 'invoiced'];
 const PRIORITY_OPTIONS = ['low', 'normal', 'high', 'urgent'];
@@ -27,6 +28,7 @@ export default function JobsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [contractors, setContractors] = useState([]);
+  const pagination = usePagination(jobs, 15);
 
   const loadJobs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -163,7 +165,7 @@ export default function JobsPage() {
                 </tr>
               </thead>
               <tbody>
-                {jobs.map(job => {
+                {pagination.paginatedItems.map(job => {
                   const prog = taskProgress(job.checklist);
                   return (
                     <tr
@@ -218,7 +220,7 @@ export default function JobsPage() {
 
           {/* Mobile Card List (Instant Touch Experience for Contractors) */}
           <div className="jobs-mobile-card-list fade-in">
-            {jobs.map(job => {
+            {pagination.paginatedItems.map(job => {
               const prog = taskProgress(job.checklist);
               return (
                 <div
@@ -269,6 +271,15 @@ export default function JobsPage() {
               );
             })}
           </div>
+
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalItems={pagination.totalItems}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.onPageChange}
+            onPageSizeChange={pagination.onPageSizeChange}
+            pageSizeOptions={[10, 15, 25, 50]}
+          />
         </>
       )}
 

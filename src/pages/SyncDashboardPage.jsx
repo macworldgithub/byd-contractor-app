@@ -6,6 +6,7 @@ import {
 import AppLayout from '../components/layout/AppLayout';
 import { integrationApi, jobsApi, DELIVERY_CENTRE_URL } from '../api/client';
 import { formatDateTime, timeAgo } from '../utils/helpers';
+import Pagination, { usePagination } from '../components/common/Pagination';
 
 export default function SyncDashboardPage() {
   const [syncStatus, setSyncStatus] = useState(null);
@@ -15,6 +16,7 @@ export default function SyncDashboardPage() {
   const [expanded, setExpanded] = useState({});
   const [lastRefresh, setLastRefresh] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const allJobsPagination = usePagination(recentJobs, 10);
 
   const load = useCallback(async () => {
     try {
@@ -247,7 +249,7 @@ export default function SyncDashboardPage() {
             <table>
               <thead><tr><th>Job</th><th>VIN</th><th>DC ID</th><th>Sync Status</th><th>Last Sync</th><th>Action</th></tr></thead>
               <tbody>
-                {recentJobs.map(job => {
+                {allJobsPagination.paginatedItems.map(job => {
                   const dcId = job.client_id || job.dc_job_id;
                   const isSynced = job.sync_status === 'synced' || (Boolean(dcId) && job.sync_status !== 'failed' && !job.sync_error);
                   const isFailed = job.sync_status === 'failed' || Boolean(job.sync_error);
@@ -282,6 +284,14 @@ export default function SyncDashboardPage() {
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={allJobsPagination.currentPage}
+              totalItems={allJobsPagination.totalItems}
+              pageSize={allJobsPagination.pageSize}
+              onPageChange={allJobsPagination.onPageChange}
+              onPageSizeChange={allJobsPagination.onPageSizeChange}
+              pageSizeOptions={[10, 20, 50]}
+            />
           </div>
         )}
       </div>

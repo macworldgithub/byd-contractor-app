@@ -163,9 +163,9 @@ export default function SettingsPage() {
         <h1>Settings</h1>
       </div>
 
-      <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem', width: '100%' }}>
+      <div className="settings-grid">
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Pending work ({pendingWork.length})</h2><button className="btn btn-ghost btn-sm" disabled={!isOnline || retryingWork || !pendingWork.length} onClick={retryWork}>{retryingWork ? 'Syncing...' : 'Retry sync'}</button></div>
+          <div className="card-header"><h2 className="card-title">Pending work ({pendingWork.length})</h2><button className="btn btn-ghost btn-sm" disabled={!isOnline || retryingWork || !pendingWork.length} onClick={retryWork} style={{ flexShrink: 0 }}>{retryingWork ? 'Syncing...' : 'Retry sync'}</button></div>
           {!pendingWork.length && <p>All saved work has been synced.</p>}
           {pendingWork.map(action => <div key={action.client_action_id} style={{ marginTop: 12 }}><strong>{action.action_type.replaceAll('_', ' ')}</strong><p>Job {action.job_id} - {formatDateTime(action.queued_at)}</p>{action.last_error && <p role="alert" style={{ color: 'var(--byd-red)' }}>{action.last_error}</p>}</div>)}
         </div>
@@ -174,13 +174,13 @@ export default function SettingsPage() {
         <div className="card">
           <div className="card-header">
             <span className="card-title">Account Details</span>
-            <Settings size={18} style={{ color: 'var(--text-muted)' }} />
+            <Settings size={18} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem' }}>
-            <div className="avatar lg">{user?.name?.slice(0, 2).toUpperCase()}</div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>{user?.name}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{user?.email}</div>
+            <div className="avatar lg" style={{ flexShrink: 0 }}>{user?.name?.slice(0, 2).toUpperCase()}</div>
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+              <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.name}</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>{user?.email}</div>
               <span className="badge" style={{ marginTop: 4, background: 'var(--byd-red-muted)', color: 'var(--byd-red-light)' }}>
                 {user?.role?.replace('_', ' ')}
               </span>

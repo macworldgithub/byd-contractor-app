@@ -75,7 +75,8 @@ export default function Topbar() {
       <div className="mobile-topbar-header">
         <div className="mobile-topbar-left">
           <div className="mobile-brand-meta">
-            BYD FAIRFIELD · CONTRACTOR HUB
+            <span>BYD FAIRFIELD</span>
+            <span className="mobile-brand-suffix"> · CONTRACTOR HUB</span>
           </div>
           <div className="mobile-greeting-title">
             BYD <span className="mobile-user-highlight">Contractor Hub</span>

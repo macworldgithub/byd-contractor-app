@@ -3,12 +3,14 @@ import AppLayout from '../components/layout/AppLayout';
 import { timeApi, jobsApi } from '../api/client';
 import { formatDate, formatDateTime, formatDuration, timeAgo } from '../utils/helpers';
 import { Clock } from 'lucide-react';
+import Pagination, { usePagination } from '../components/common/Pagination';
 
 export default function TimeLogsPage() {
   const [logs, setLogs] = useState([]);
   const [jobs, setJobs] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeLog, setActiveLog] = useState(null);
+  const pagination = usePagination(logs, 15);
 
   useEffect(() => {
     const load = async () => {
@@ -84,7 +86,7 @@ export default function TimeLogsPage() {
               </tr>
             </thead>
             <tbody>
-              {logs.map(log => (
+              {pagination.paginatedItems.map(log => (
                 <tr key={log.id}>
                   <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{log.contractor_name}</td>
                   <td>
@@ -110,6 +112,14 @@ export default function TimeLogsPage() {
               ))}
             </tbody>
           </table>
+          <Pagination
+            currentPage={pagination.currentPage}
+            totalItems={pagination.totalItems}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.onPageChange}
+            onPageSizeChange={pagination.onPageSizeChange}
+            pageSizeOptions={[10, 15, 25, 50]}
+          />
         </div>
       )}
     </AppLayout>
