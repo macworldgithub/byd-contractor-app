@@ -762,6 +762,14 @@ small {
   color: var(--text-muted);
 }
 
+/* Normalize date inputs across browsers */
+input[type="date"].form-input {
+  min-height: 42px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .form-textarea {
   resize: vertical;
   min-height: 80px;
@@ -2040,12 +2048,13 @@ tr:hover td {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--space-3);
-  align-items: flex-end;
+  align-items: start;
 }
 
 .analytics-clear-wrap {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
+  padding-top: var(--space-4);
 }
 
 .table-compact table {
@@ -2970,12 +2979,14 @@ tr:hover td {
   }
 
   .analytics-filters-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: var(--space-2);
+    align-items: start;
   }
 
   .analytics-clear-wrap {
-    grid-column: span 2;
+    grid-column: span 1;
+    padding-top: 0;
   }
 
   .analytics-export-actions {
@@ -3018,6 +3029,7 @@ tr:hover td {
 
   .analytics-clear-wrap {
     grid-column: span 1 !important;
+    padding-top: var(--space-2);
   }
 
   .topbar {

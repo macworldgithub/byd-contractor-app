@@ -224,12 +224,12 @@ export const adminApi = {
     const q = new URLSearchParams();
     if (role) q.set('role', role);
     if (active_only) q.set('active_only', 'true');
-    return api.get(`/api/contractor/users?${q.toString()}`);
+    return api.get(`/api/admin/users?${q.toString()}`);
   },
-  createUser: (data) => api.post('/api/contractor/users', data),
-  updateUser: (uid, data) => api.patch(`/api/contractor/users/${uid}`, data),
-  resetPassword: (uid) => api.post(`/api/contractor/users/${uid}/reset-password`),
-  deactivateUser: (uid) => api.delete(`/api/contractor/users/${uid}`),
+  createUser: (data) => api.post('/api/admin/users', data),
+  updateUser: (uid, data) => api.patch(`/api/admin/users/${uid}`, data),
+  resetPassword: (uid) => api.post(`/api/admin/users/${uid}/reset-password`),
+  deactivateUser: (uid) => api.delete(`/api/admin/users/${uid}`),
   auditLog: (limit = 100) => api.get(`/api/admin/audit?limit=${limit}`),
 };
 
